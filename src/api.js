@@ -166,6 +166,7 @@ export function createApi(store) {
             title: shoppingTitle(g.items.map((i) => i.text)),
             amount: g.amount,
             paidBy,
+            ...(paidBy === KASSE && g.advancedBy ? { advancedBy: g.advancedBy } : {}),
             split: paidBy === KASSE || !g.split?.length ? allIds : g.split,
             date,
             createdBy: me,

@@ -243,20 +243,24 @@ test('per-person debts always add up to the balances', () => {
   let r = 7;
   const rnd = (n) => ((r = (r * 1103515245 + 12345) % 2147483648) % n);
   const txs = [];
-  for (let i = 0; i < 300; i++) {
-    const k = rnd(10);
+  for (let i = 0; i < 400; i++) {
+    const k = rnd(12);
     if (k < 6) {
       const split = ids.filter(() => rnd(3) > 0);
       txs.push({ type: 'expense', amount: 1 + rnd(9000), paidBy: rnd(6) === 0 ? KASSE : ids[rnd(5)], split });
     } else if (k < 8) {
       txs.push({ type: 'transfer', amount: 1 + rnd(3000), from: ids[rnd(5)], to: ids[rnd(5)] });
+    } else if (k < 9) {
+      txs.push({ type: 'expense', amount: 1 + rnd(900), paidBy: KASSE, advancedBy: ids[rnd(5)], split: ids });
+    } else if (k < 10) {
+      txs.push({ type: 'transfer', amount: 1 + rnd(900), from: KASSE, to: ids[rnd(5)] });
     } else {
       txs.push({ type: 'deposit', amount: 1000, member: ids[rnd(5)], month: '2026-10' });
     }
   }
   const s = computeSummary(txs);
   for (const id of ids) {
-    const fromPairs = ids.reduce((sum, other) => sum - owes(s.pairs, id, other), 0);
+    const fromPairs = [...ids, KASSE].reduce((sum, other) => sum - owes(s.pairs, id, other), 0);
     assert.equal(fromPairs, s.balances[id] || 0, id);
   }
   assert.ok(summariesEqual(summaryOf(s), computeSummary([...txs].reverse())));
@@ -308,4 +312,21 @@ test('weeks are named like at TU Darmstadt: Vorlesungswoche, Weihnachtspause, Se
   assert.equal(weekInfo(w('2026-09-30')).title, 'Semesterferien');
   assert.equal(relWeek(w('2026-10-05'), w('2026-10-12')), 'letzte Woche');
   assert.equal(relWeek(w('2026-10-26'), w('2026-10-12')), '3. Vorlesungswoche');
+});
+
+test('paid out of pocket for the Kasse: the Kasse owes you until it pays you back', () => {
+  const soap = { type: 'expense', title: 'Spülmittel', amount: 200, paidBy: KASSE, advancedBy: 'yessu', split: ['yessu', 'felix'] };
+  const e = txEffect(soap);
+  assert.equal(e.kasse, 0, 'the cash is still in the Kasse');
+  assert.equal(owes(e.pairs, KASSE, 'yessu'), 200);
+  assert.deepEqual(e.balances, { yessu: 200 });
+  assert.deepEqual(debtList(e.pairs), [{ from: KASSE, to: 'yessu', amount: 200 }]);
+  const after = computeSummary([soap, { type: 'transfer', title: 'Erstattung aus der Kasse', amount: 200, from: KASSE, to: 'yessu' }]);
+  assert.equal(after.kasse, -200, 'now it left the Kasse');
+  assert.deepEqual(debtList(after.pairs), []);
+  assert.deepEqual(after.balances, {});
+  // paid straight from the Kasse: no debt at all
+  const direct = txEffect({ type: 'expense', amount: 200, paidBy: KASSE, advancedBy: null, split: ['yessu'] });
+  assert.equal(direct.kasse, -200);
+  assert.deepEqual(direct.pairs, {});
 });

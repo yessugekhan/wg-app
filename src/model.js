@@ -141,10 +141,11 @@ export function summaryOf(doc) {
  * pairs: who owes whom, per pair of people (see pairKey). The pairs of a person always add up to their balance.
  * kasse: cash in the shared WG-Kasse. contrib: monthly Kasse contributions per member.
  *
- * expense  {amount, paidBy: memberId | 'kasse', split: [memberIds]}
+ * expense  {amount, paidBy: memberId | 'kasse', split: [memberIds], advancedBy?}
+ *          paidBy 'kasse' + advancedBy: someone paid out of pocket for the Kasse, the Kasse owes them
  * deposit  {amount, member, month?}   member puts money into the Kasse
  * adjust   {amount (signed)}          correct the Kasse balance to match reality
- * transfer {amount, from, to}         "from" paid "to" back
+ * transfer {amount, from, to}         "from" paid "to" back; from 'kasse' = paid out of the Kasse
  */
 export function txEffect(tx) {
   const e = emptyEffect();
@@ -152,7 +153,13 @@ export function txEffect(tx) {
   switch (tx?.type) {
     case 'expense': {
       if (tx.paidBy === KASSE) {
-        e.kasse -= a;
+        if (tx.advancedBy && tx.advancedBy !== KASSE) {
+          // the cash stays in the Kasse until whoever keeps it pays this person back
+          bump(e.balances, tx.advancedBy, a);
+          owe(e.pairs, KASSE, tx.advancedBy, a);
+        } else {
+          e.kasse -= a;
+        }
       } else {
         bump(e.balances, tx.paidBy, a);
         const split = tx.split && tx.split.length ? tx.split : [tx.paidBy];
@@ -171,8 +178,10 @@ export function txEffect(tx) {
       e.kasse += a;
       break;
     case 'transfer':
-      bump(e.balances, tx.from, a);
-      bump(e.balances, tx.to, -a);
+      if (tx.from === KASSE) e.kasse -= a;
+      else bump(e.balances, tx.from, a);
+      if (tx.to === KASSE) e.kasse += a;
+      else bump(e.balances, tx.to, -a);
       owe(e.pairs, tx.from, tx.to, -a);
       break;
     default:

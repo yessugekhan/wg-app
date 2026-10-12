@@ -218,7 +218,7 @@ try {
   for (let i = 0; i < 12 && (await page.$('.debt .btn')); i++) {
     const n = await page.$$eval('.debt .btn', (b) => b.length);
     await tap(await page.$('.debt .btn'));
-    await byText(page, '.sheet h2', 'Rückzahlung eintragen');
+    await page.waitForSelector('.sheet h2', { visible: true });
     await click(page, '.sheet__foot button', 'Eintragen');
     await page.waitForFunction((n) => document.querySelectorAll('.debt .btn').length < n, { timeout: 4000 }, n);
   }
@@ -226,7 +226,8 @@ try {
   s = await state(page);
   assert.ok(Object.values(s.meta.summary.balances).every((v) => v === 0), 'all balances zero after settling');
   assert.deepEqual(debtList(s.meta.summary.pairs), [], 'nobody owes anybody');
-  log(`settled ${debts.length} debts person to person, everyone at 0`);
+  assert.ok(debts.some((d) => d.from === 'kasse'), 'the demo has money laid out for the Kasse');
+  log(`settled ${debts.length} debts person to person and from the Kasse, everyone at 0`);
 
   // manual expense with the FAB, split between two people
   await (await page.$('.fab')).click();
@@ -278,6 +279,31 @@ try {
   s = await state(page);
   assert.ok(summariesEqual(summaryOf(s.meta.summary), computeSummary(Object.values(s.tx))));
   log('edit and delete keep the books exact');
+
+  // laid out for the Kasse: the Kasse (kept by Ben) owes Anna until Ben pays her back
+  const kasseNow = (await state(page)).meta.summary.kasse;
+  await (await page.$('.fab')).click();
+  await byText(page, '.sheet h2', 'Neue Buchung');
+  await new Promise((r) => setTimeout(r, 300));
+  await typeInto(page, '.sheet input.input[type=text]', 'Spülmittel');
+  await (await page.$('.sheet .money input')).type('2');
+  await click(page, '.sheet .field[aria-label="Bezahlt von"] .person', 'Kasse');
+  const advHint = await page.$$eval('.sheet .field__hint', (e) => e.map((x) => x.textContent));
+  assert.ok(advHint.includes(`Die Kasse gibt dir 2,00${NBSP}€ zurück, Ben zahlt es aus.`), advHint.join(' | '));
+  await shot(page, '08c-kasse-ausgelegt');
+  await click(page, '.sheet__foot button', 'Speichern');
+  await waitHeadline(page, `Die Kasse schuldet dir 2,00${NBSP}€.`);
+  assert.equal(await textOf(page, '.debt__why'), 'für Spülmittel, Ben zahlt aus');
+  assert.equal((await state(page)).meta.summary.kasse, kasseNow, 'nothing left the Kasse yet');
+  await click(page, '.debt .btn', 'Erhalten');
+  await byText(page, '.sheet h2', 'Erstattung aus der Kasse');
+  assert.ok((await textOf(page, '.sheet .sheet__text')).startsWith(`Hat Ben dir 2,00${NBSP}€ aus der Kasse gegeben?`));
+  await click(page, '.sheet__foot button', 'Eintragen');
+  await waitHeadline(page, 'Du bist mit allen quitt.');
+  s = await state(page);
+  assert.equal(s.meta.summary.kasse, kasseNow - 200, 'paid out of the Kasse');
+  assert.ok(summariesEqual(summaryOf(s.meta.summary), computeSummary(Object.values(s.tx))));
+  log('laid out 2,00 € for the Kasse, Ben paid it back from the Kasse');
 
   // "everybody owes me 3,50": typed per person
   await (await page.$('.fab')).click();

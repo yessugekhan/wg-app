@@ -6,7 +6,7 @@ Einkaufsliste, Geld, Putzplan und Pinnwand für eine WG. Läuft im Browser, läs
 
 - **Liste**: Was fehlt, wer es holt, was gerade jemand im Korb hat (live). Haushaltszeug wie Klopapier oder Spülmittel wird automatisch als „Kasse“ markiert. Darunter Woche für Woche, wer wann was gekauft hat.
 - **Einkauf abschließen**: Betrag vom Bon eintippen, fertig. Kassen-Sachen gehen von der WG-Kasse ab, der Rest wird auf alle (oder ausgewählte Leute) aufgeteilt.
-- **Geld**: Wer wem wie viel schuldet, Person für Person und mit den Einkäufen, aus denen es kommt („Du schuldest Simon 3,50 € für Ofenhandschuhe“). Beträge gesamt oder pro Person eintragen. WG-Kasse mit Monatsbeiträgen, Kassenstand korrigieren, jede Buchung bearbeitbar.
+- **Geld**: Wer wem wie viel schuldet, Person für Person und mit den Einkäufen, aus denen es kommt („Du schuldest Simon 3,50 € für Ofenhandschuhe“). Beträge gesamt oder pro Person eintragen. WG-Kasse mit Monatsbeiträgen und festem Kassenwart: Was jemand für die Kasse auslegt, steht als offene Erstattung da, bis der Kassenwart es aus der Kasse zurückzahlt. Kassenstand korrigieren, jede Buchung bearbeitbar.
 - **Putzen**: Rotierender Putzplan (wöchentlich, alle 2 oder 4 Wochen), Tauschen für eine Woche, Nachtragen, Verlauf „wer hat wann geputzt“, Statistik der letzten 8 Wochen. Wochen heißen wie an der TU Darmstadt („3. Vorlesungswoche“, „Weihnachtspause“, „Semesterferien“), die Termine stehen in `SEMESTERS` in `src/model.js`.
 - **Pinnwand**: Nachrichten an alle, anheften, „gesehen“-Markierung.
 - Offline nutzbar: Änderungen werden synchronisiert, sobald wieder Netz da ist. Der Punkt neben dem WG-Namen zeigt den Stand (grün: alles gespeichert, gelb: offline, grau: verbindet, rot: Problem); Antippen erklärt ihn.

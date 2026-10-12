@@ -4,8 +4,8 @@ import {
   ctx, wg, activeMembers, formerMembers, chores, members, memberMap, meId, forgetMe, inviteLink, run, toast,
   theme, installPrompt, go,
 } from '../state.js';
-import { formatMoney, parseMoney, normalizeText } from '../model.js';
-import { Headline, Section, Sheet, Magnet, MoneyInput, Field, Segmented, Confirm } from './kit.jsx';
+import { formatMoney, parseMoney, normalizeText, KASSE } from '../model.js';
+import { Headline, Section, Sheet, Magnet, MoneyInput, Field, Segmented, Confirm, People as PeoplePicker } from './kit.jsx';
 import { KasseFixSheet } from './Geld.jsx';
 import { IShare, ICopy, IQr, IPencil, IPlus, IDownload, IRefresh, IJar } from './icons.jsx';
 
@@ -234,6 +234,19 @@ function KasseSettings() {
   const invalid = cents === null || cents < 0;
   return (
     <Section title="WG-Kasse" id="kasse-einstellungen">
+      <Field group label="Wer hat die Kasse?" hint="Diese Person bewahrt das Geld auf und zahlt zurück, was jemand für die Kasse ausgelegt hat.">
+        <PeoplePicker
+          kasse
+          kasseLabel="Niemand Bestimmtes"
+          list={activeMembers.value}
+          value={wg.value?.kasseHolder || KASSE}
+          label="Wer hat die Kasse?"
+          onChange={(id) => {
+            run(ctx.api.updateWg({ kasseHolder: id === KASSE ? null : id }));
+            toast(id === KASSE ? 'Die Kasse hat jetzt niemand Bestimmtes.' : id === meId.value ? 'Du hast jetzt die Kasse.' : `${memberMap.value[id]?.name} hat jetzt die Kasse.`);
+          }}
+        />
+      </Field>
       <Field label="Monatsbeitrag pro Person" hint="Leer lassen, wenn ihr keine festen Beiträge habt." error={invalid && 'Bitte einen Betrag wie 10,00 eingeben.'}>
         <MoneyInput value={v} onInput={setV} label="Monatsbeitrag pro Person" placeholder="z. B. 10,00" />
       </Field>

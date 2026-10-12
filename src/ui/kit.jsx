@@ -225,13 +225,13 @@ export function Segmented({ options, value, onChange, label }) {
 }
 
 /** Pick one person (optionally the Kasse) or several people, as magnet chips. */
-export function People({ list, value, onChange, multi = false, kasse = false, label }) {
+export function People({ list, value, onChange, multi = false, kasse = false, kasseLabel = 'Kasse', label }) {
   const isOn = (id) => (multi ? value.includes(id) : value === id);
   const toggle = (id) => {
     if (!multi) return onChange(id);
     onChange(isOn(id) ? value.filter((x) => x !== id) : [...value, id]);
   };
-  const entries = [...(kasse ? [{ id: KASSE, name: 'Kasse' }] : []), ...list];
+  const entries = [...(kasse ? [{ id: KASSE, name: kasseLabel }] : []), ...list];
   return (
     <div class="people" role={multi ? 'group' : 'radiogroup'} aria-label={label}>
       {entries.map((m) => (

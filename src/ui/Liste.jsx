@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'preact/hooks';
 import {
   ctx, openItems, boughtItems, activeMembers, meId, name, nameDat, joinNames, run, toast, clock, visitSeen,
-  txs, txLimit, boughtLimit, currentWeek, pendingForm, go,
+  txs, txLimit, boughtLimit, currentWeek, pendingForm, go, kasseHolder,
 } from '../state.js';
 import {
   guessKasse, suggest, relTime, parseMoney, formatMoney, KASSE, normalizeText, splitEvenly, dayKey, dayLabelInline, weekIndex,
@@ -231,7 +231,7 @@ export function purchaseEntries(bought, txList) {
   // things bought without the list (oven gloves, internet bill, pizza) are bookings only
   for (const t of txList) {
     if (t.type !== 'expense' || t.itemIds?.length) continue;
-    out.push({ key: t.id, by: t.paidBy === KASSE ? t.createdBy : t.paidBy, at: t.createdAt || 0, date: t.date, items: [t.title], txs: [t], manual: true });
+    out.push({ key: t.id, by: t.paidBy === KASSE ? t.advancedBy || t.createdBy : t.paidBy, at: t.createdAt || 0, date: t.date, items: [t.title], txs: [t], manual: true });
   }
   return out.sort((a, b) => (a.date === b.date ? b.at - a.at : a.date < b.date ? 1 : -1));
 }
@@ -286,7 +286,7 @@ function Bought() {
                         <span key={t.id}>
                           {' · '}
                           {formatMoney(t.amount)}
-                          {t.paidBy === KASSE ? ' aus der Kasse' : perPerson(t) ? `, ${perPerson(t)}` : ''}
+                          {t.paidBy === KASSE ? (t.advancedBy ? ', die Kasse erstattet' : ' aus der Kasse') : perPerson(t) ? `, ${perPerson(t)}` : ''}
                         </span>
                       ))}
                     </span>
@@ -422,7 +422,7 @@ function Checkout({ open, items, onClose }) {
     setTried(true);
     if (errK || errS || errSplit) return;
     const groups = [];
-    if (kasseItems.length) groups.push({ items: kasseItems, amount: centsK, paidBy: payK === KASSE ? KASSE : me, split: allIds });
+    if (kasseItems.length) groups.push({ items: kasseItems, amount: centsK, paidBy: KASSE, advancedBy: payK === KASSE ? null : me, split: allIds });
     if (sharedItems.length) groups.push({ items: sharedItems, amount: centsS, paidBy: payerId, split: splitIds });
     run(ctx.api.completeShopping({ me, groups, allIds }));
     const total = (centsK || 0) + (centsS || 0);
@@ -462,7 +462,13 @@ function Checkout({ open, items, onClose }) {
           </Field>
           <Field group
             label="Bezahlt"
-            hint={payK === KASSE ? 'Wird vom Kassenstand abgezogen.' : 'Du hast ausgelegt, es wird auf alle aufgeteilt.'}
+            hint={
+              payK === KASSE
+                ? 'Wird vom Kassenstand abgezogen.'
+                : kasseHolder.value && kasseHolder.value !== me
+                  ? `${name(kasseHolder.value)} gibt dir das Geld aus der Kasse zurück.`
+                  : 'Die Kasse gibt dir das Geld zurück.'
+            }
           >
             <div class="seg" role="radiogroup" aria-label="Bezahlt">
               <button type="button" role="radio" aria-checked={payK === KASSE} class={`seg__opt${payK === KASSE ? ' is-on' : ''}`} onClick={() => setPayK(KASSE)}>

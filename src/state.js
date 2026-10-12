@@ -3,7 +3,7 @@
 import { signal, computed, effect } from '@preact/signals';
 import { createLocalStore, safeLocalStorage } from './store/local.js';
 import { createApi } from './api.js';
-import { weekIndex, debtList, SUMMARY_VERSION } from './model.js';
+import { weekIndex, debtList, SUMMARY_VERSION, KASSE } from './model.js';
 
 export const TABS = ['liste', 'geld', 'putzen', 'pinnwand', 'wg'];
 
@@ -112,11 +112,17 @@ export const screen = computed(() => {
 
 export function name(id, { cap = false } = {}) {
   if (id === meId.value) return cap ? 'Du' : 'du';
+  if (id === KASSE) return cap ? 'Die Kasse' : 'die Kasse';
   return memberMap.value[id]?.name || 'Jemand';
 }
 /** Dative and accusative forms: "von dir", "für dich". */
-export const nameDat = (id) => (id === meId.value ? 'dir' : memberMap.value[id]?.name || 'jemandem');
-export const nameAcc = (id) => (id === meId.value ? 'dich' : memberMap.value[id]?.name || 'jemanden');
+export const nameDat = (id) => (id === meId.value ? 'dir' : id === KASSE ? 'der Kasse' : memberMap.value[id]?.name || 'jemandem');
+export const nameAcc = (id) => (id === meId.value ? 'dich' : id === KASSE ? 'die Kasse' : memberMap.value[id]?.name || 'jemanden');
+/** Who keeps the WG-Kasse (set in the WG settings), if anyone. */
+export const kasseHolder = computed(() => {
+  const id = wg.value?.kasseHolder;
+  return id && memberMap.value[id] ? id : null;
+});
 
 /** "Anna", "Anna und Ben", "Anna, Ben und Clara". */
 export function joinNames(list) {
