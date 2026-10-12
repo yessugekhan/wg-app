@@ -1,6 +1,6 @@
 // Offline shell for the WG-App. Data itself is cached by Firestore (IndexedDB), not here.
-const VERSION = 'wg-1.0.0+202610120913';
-const PRECACHE = ["./","./index.html","./config.js","./assets/app-46bc129b81.css","./assets/main-DXCR4CX2.js","./assets/chunk-EKDC6YXR.js","./assets/chunk-GEWU5KFR.js","./assets/fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-wght-normal.woff2","./manifest.webmanifest","./icons/icon-192.png"];
+const VERSION = 'wg-1.0.0+202610120935';
+const PRECACHE = ["./","./index.html","./config.js","./assets/app-46bc129b81.css","./assets/main-IX4H3TGG.js","./assets/chunk-EKDC6YXR.js","./assets/chunk-GEWU5KFR.js","./assets/fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-wght-normal.woff2","./manifest.webmanifest","./icons/icon-192.png"];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

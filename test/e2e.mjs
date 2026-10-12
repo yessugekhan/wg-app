@@ -368,8 +368,8 @@ try {
   await typeInto(live, '.start input', 'kein link');
   await click(live, 'button', 'Beitreten');
   await byText(live, '.field__error', 'kein Einladungslink');
-  await live.goto(`${base}live/#wg=HarnessWG0123456789abcd`, { waitUntil: 'load' });
-  await live.reload({ waitUntil: 'load' });
+  // the invite link opened in the same tab is only a hash change: the app must restart on its own
+  await live.evaluate(() => { location.hash = 'wg=HarnessWG0123456789abcd'; });
   await waitHeadline(live, 'Verbinde mit eurer WG');
   assert.deepEqual(liveErrors, [], 'real config boots without script errors');
   log('real config: join screen without code, connect screen with code (Firestore unreachable from here)');

@@ -215,7 +215,8 @@ export async function boot(config) {
   window.addEventListener('offline', () => (sync.value = { ...sync.value, offline: true }));
   window.addEventListener('hashchange', () => {
     const p = parseHash();
-    if (p.wg && ctx.kind === 'firestore' && p.wg !== ctx.wgId) location.reload();
+    // an invite link opened in a tab that already shows the app (join screen or another WG) needs a fresh start
+    if (p.wg && (needJoin.peek() || (ctx.kind === 'firestore' && p.wg !== ctx.wgId))) location.reload();
     else if (p.tab && TABS.includes(p.tab) && p.tab !== route.value) route.value = p.tab;
   });
 
