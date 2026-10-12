@@ -43,9 +43,9 @@ export function WG() {
           value={theme.value}
           onChange={(v) => (theme.value = v)}
           options={[
-            { value: 'system', label: 'Wie das Handy' },
             { value: 'light', label: 'Hell' },
             { value: 'dark', label: 'Dunkel' },
+            { value: 'system', label: 'Wie das Handy' },
           ]}
         />
       </Section>

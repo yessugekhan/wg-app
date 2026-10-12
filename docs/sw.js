@@ -1,6 +1,6 @@
 // Offline shell for the WG-App. Data itself is cached by Firestore (IndexedDB), not here.
-const VERSION = 'wg-1.0.0+202610120935';
-const PRECACHE = ["./","./index.html","./config.js","./assets/app-46bc129b81.css","./assets/main-IX4H3TGG.js","./assets/chunk-EKDC6YXR.js","./assets/chunk-GEWU5KFR.js","./assets/fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-wght-normal.woff2","./manifest.webmanifest","./icons/icon-192.png"];
+const VERSION = 'wg-1.0.0+202610121053';
+const PRECACHE = ["./","./index.html","./config.js","./assets/app-e1cfd19592.css","./assets/main-WYETTA3A.js","./assets/chunk-EKDC6YXR.js","./assets/chunk-GEWU5KFR.js","./assets/fonts/permanent-marker-latin-400-normal.woff2","./assets/fonts/barlow-condensed-latin-500-normal.woff2","./assets/fonts/barlow-condensed-latin-ext-500-normal.woff2","./assets/fonts/barlow-condensed-latin-600-normal.woff2","./assets/fonts/barlow-condensed-latin-ext-600-normal.woff2","./assets/fonts/barlow-condensed-latin-700-normal.woff2","./assets/fonts/barlow-condensed-latin-ext-700-normal.woff2","./manifest.webmanifest","./icons/icon-192.png"];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

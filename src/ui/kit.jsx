@@ -30,6 +30,79 @@ export function KasseMagnet({ size = 30 }) {
   );
 }
 
+// ---------------------------------------------------------------- marker drawings
+// Strokes use pathLength=100 so the .draw animation always runs the full line.
+
+/** Hand-drawn tick box; checked adds a red check that is drawn in. */
+export function Box({ checked = false, size = 30 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false">
+      <path d="M4.5 5.6 L27 3.8 L28.4 27.2 L5.2 28.6 Z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" />
+      {checked && (
+        <path
+          class="draw draw--check"
+          pathLength="100"
+          d="M7.5 16 L14 23.5 L29 2"
+          stroke="var(--red)"
+          stroke-width="3.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      )}
+    </svg>
+  );
+}
+
+/** A marker line through the word it sits in (parent must be position: relative). */
+export function Strike({ muted = false }) {
+  return (
+    <svg class="strike" viewBox="0 0 200 24" preserveAspectRatio="none" fill="none" aria-hidden="true" focusable="false">
+      <path
+        class="draw"
+        pathLength="100"
+        d="M2 14 C 40 7, 80 18, 120 10 S 180 14, 198 8"
+        stroke={muted ? 'var(--ink-3)' : 'var(--red)'}
+        stroke-width={muted ? 3 : 4.4}
+        stroke-linecap="round"
+      />
+    </svg>
+  );
+}
+
+/** A red check on its own (chores done). */
+export function Check({ size = 30 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false">
+      <path
+        class="draw draw--check"
+        pathLength="100"
+        d="M4 17 L12 25.5 L29 4"
+        stroke="currentColor"
+        stroke-width="3.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** A loose marker circle, drawn around whatever sits on top of it. */
+export function Ring({ width = 40, height = 40, color = 'currentColor', animate = false }) {
+  return (
+    <svg width={width} height={height} viewBox="0 0 40 40" preserveAspectRatio="none" fill="none" aria-hidden="true" focusable="false">
+      <path
+        class={animate ? 'draw' : undefined}
+        pathLength="100"
+        d="M21 4 C 31 4, 37 12, 36 21 C 35 31, 27 37, 18 36 C 9 35, 3 27, 4 18 C 5 10, 12 4, 23 5"
+        stroke={color}
+        stroke-width="2.3"
+        stroke-linecap="round"
+        vector-effect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 /** The big sentence each tab opens with. */
 export function Headline({ children, sub }) {
   return (

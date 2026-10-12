@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { ctx, chores, choreLog, activeMembers, meId, currentWeek, name, nameDat, joinNames, run, toast } from '../state.js';
 import { choreDue, choreAssignee, choreLogId, weekInfo, weekIndex, nextDueWeek } from '../model.js';
-import { Headline, Section, Sheet, Magnet, People, Field, Segmented, Confirm, Empty } from './kit.jsx';
+import { Headline, Section, Sheet, Magnet, People, Field, Segmented, Confirm, Check, Strike } from './kit.jsx';
 import { ICheck, IUndo, IPencil, IPlus } from './icons.jsx';
 
 const ICONS = ['🚿', '🛁', '🚽', '🍳', '🧽', '🗑️', '♻️', '🧹', '🪟', '🧺', '🪴', '📦'];
@@ -85,7 +85,10 @@ export function Putzen() {
               <li class={`chore${a === me ? ' is-mine' : ''}${d ? ' is-done' : ''}`} key={c.id}>
                 <span class="chore__icon" aria-hidden="true">{c.icon}</span>
                 <button type="button" class="chore__main" onClick={() => setSheet({ chore: c, week })}>
-                  <span class="chore__name">{c.name}</span>
+                  <span class="chore__name">
+                    {c.name}
+                    {d && <Strike />}
+                  </span>
                   <span class="chore__who">
                     {d
                       ? d === a
@@ -99,8 +102,8 @@ export function Putzen() {
                 </button>
                 <Magnet id={a} size={30} />
                 {d ? (
-                  <span class="done-mark" aria-label="erledigt">
-                    <ICheck size={20} />
+                  <span class="done-mark" role="img" aria-label="erledigt">
+                    <Check size={32} />
                   </span>
                 ) : (
                   <button type="button" class={`btn btn--small${a === me ? ' btn--primary' : ''}`} onClick={() => markDone(c, week)}>
@@ -176,7 +179,7 @@ export function Putzen() {
                         {a ? (
                           <span class="plan__cell">
                             <Magnet id={a} size={28} label />
-                            {doneBy(c, w) && <span class="plan__done" aria-label="erledigt"><ICheck size={12} /></span>}
+                            {doneBy(c, w) && <span class="plan__done" role="img" aria-label="erledigt"><Check size={18} /></span>}
                           </span>
                         ) : (
                           <span class="muted" aria-label="nicht dran">–</span>

@@ -135,10 +135,12 @@ try {
   log('adding items, Kasse guess and duplicate check work');
 
   // shopping: tick three items into the basket and finish the trip
-  for (const t of ['Brot', 'Spülmittel', 'Käse']) await tap(await page.$(`button[aria-label="${t} in den Korb"]`));
-  await byText(page, '.section__head h2', 'In deinem Korb');
+  for (const t of ['Brot', 'Spülmittel', 'Käse']) await tap(await page.$(`button[aria-label="${t} abhaken"]`));
+  await page.waitForSelector('.checkout-bar', { visible: true });
+  await waitHeadline(page, '4 Sachen fehlen.');
   const sub = await textOf(page, '.headline__sub');
-  assert.ok(sub.includes('Du hast 3 Sachen im Korb.'), sub);
+  assert.ok(sub.includes('Du hast 3 Sachen abgehakt.'), sub);
+  assert.equal(await page.$$eval('.item.is-mine .strike', (e) => e.length), 3, 'crossed off in place');
   await shot(page, '04-korb');
   await click(page, 'button', 'Einkauf abschließen');
   await byText(page, '.sheet h2', 'Einkauf abschließen');
@@ -284,7 +286,7 @@ try {
   await typeInto(page2, '.adder input', 'Zitronen');
   await page2.keyboard.press('Enter');
   await waitHeadline(page, '5 Sachen fehlen.');
-  await byText(page, '.item__text', 'Zitronen');
+  await byText(page, '.item__word', 'Zitronen');
   log('second tab added Zitronen, first tab updated live');
   await page2.close();
 
@@ -345,6 +347,7 @@ try {
   // ------------------------------------------------------------------ dark mode first impression
   const ctx3 = await browser.createBrowserContext();
   const dark = await phone(ctx3, { dark: true });
+  await dark.evaluateOnNewDocument(() => localStorage.setItem('wgapp:theme', 'dark'));
   await dark.goto(base, { waitUntil: 'networkidle0' });
   await click(dark, 'button', 'Beispiel-WG ansehen');
   await click(dark, '.who-btn', 'Ben');

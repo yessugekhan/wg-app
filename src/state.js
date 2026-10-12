@@ -57,7 +57,7 @@ export const clock = signal(Date.now());
 export const seen = signal({});
 export const visitSeen = signal({});
 export const toasts = signal([]);
-export const theme = signal(readLS('wgapp:theme') || 'system');
+export const theme = signal(readLS('wgapp:theme') || 'light');
 export const installPrompt = signal(null);
 
 // ---------------------------------------------------------------- derived
@@ -200,9 +200,8 @@ effect(() => {
 effect(() => {
   const t = theme.value;
   if (typeof document === 'undefined') return;
-  if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
-  else delete document.documentElement.dataset.theme;
-  writeLS('wgapp:theme', t === 'system' ? null : t);
+  document.documentElement.dataset.theme = t;
+  writeLS('wgapp:theme', t === 'light' ? null : t);
 });
 
 // ---------------------------------------------------------------- boot

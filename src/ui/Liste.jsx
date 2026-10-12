@@ -3,119 +3,97 @@ import {
   ctx, openItems, boughtItems, activeMembers, meId, name, nameDat, joinNames, run, toast, clock, visitSeen,
 } from '../state.js';
 import { guessKasse, suggest, relTime, parseMoney, formatMoney, KASSE, normalizeText, splitEvenly } from '../model.js';
-import { Headline, Section, Sheet, Magnet, People, MoneyInput, Field, Empty } from './kit.jsx';
-import { ICheck, IPlus, ITrash, IPencil, IHand, ICart } from './icons.jsx';
+import { Headline, Sheet, Magnet, People, MoneyInput, Field, Box, Strike } from './kit.jsx';
+import { IPlus, ITrash, IPencil, IHand, ICart } from './icons.jsx';
 
 const plural = (n, one, many) => (n === 1 ? one : many.replace('#', n));
 
 export function Liste() {
   const me = meId.value;
-  const items = openItems.value;
-  const open = items.filter((i) => i.state === 'open').sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
-  const mine = items.filter((i) => i.state === 'cart' && i.cartBy === me).sort((a, b) => a.cartAt - b.cartAt);
-  const othersCarts = useMemo(() => {
-    const map = new Map();
-    for (const i of items) if (i.state === 'cart' && i.cartBy !== me) map.set(i.cartBy, [...(map.get(i.cartBy) || []), i]);
-    return [...map.entries()];
-  }, [items, me]);
+  const items = [...openItems.value].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+  const missing = items.filter((i) => i.state === 'open');
+  const mine = items.filter((i) => i.state === 'cart' && i.cartBy === me);
+  const othersShopping = [...new Set(items.filter((i) => i.state === 'cart' && i.cartBy !== me).map((i) => i.cartBy))];
   const [actionItem, setActionItem] = useState(null);
   const [checkout, setCheckout] = useState(false);
   const since = visitSeen.value.liste ?? Infinity;
 
-  const kasseCount = items.filter((i) => i.kasse).length;
+  const kasseCount = missing.filter((i) => i.kasse).length;
   const sub = [];
-  if (items.length && kasseCount) {
-    sub.push(kasseCount === items.length ? 'Alles davon zahlt die Kasse.' : `${kasseCount} davon zahlt die Kasse.`);
+  if (missing.length && kasseCount) {
+    sub.push(kasseCount === missing.length ? 'Alles davon zahlt die Kasse.' : `${kasseCount} davon zahlt die Kasse.`);
   }
-  if (othersCarts.length) {
-    const who = othersCarts.map(([id]) => name(id));
+  if (othersShopping.length) {
+    const who = othersShopping.map((id) => name(id));
     sub.push(`${joinNames(who)} ${who.length === 1 ? 'ist' : 'sind'} gerade einkaufen.`);
   }
-  if (mine.length) sub.push(`Du hast ${plural(mine.length, 'eine Sache', '# Sachen')} im Korb.`);
+  if (mine.length) sub.push(`Du hast ${plural(mine.length, 'eine Sache', '# Sachen')} abgehakt.`);
   if (!items.length) sub.push('Schreib auf, was fehlt. Alle sehen es sofort.');
+
+  let head = plural(missing.length, '1 Sache fehlt.', '# Sachen fehlen.');
+  if (!items.length) head = 'Alles da.';
+  else if (!missing.length) head = 'Alles im Korb.';
+
+  const tick = (it, inOther) => {
+    if (inOther) {
+      toast(`${name(it.cartBy, { cap: true })} hat das schon im Korb.`);
+      return;
+    }
+    run(ctx.api.toggleCart(it, me));
+  };
 
   return (
     <>
-      <Headline sub={sub.join(' ')}>
-        {items.length === 0 ? 'Alles da.' : plural(items.length, '1 Sache fehlt.', '# Sachen fehlen.')}
-      </Headline>
+      <Headline sub={sub.join(' ')}>{head}</Headline>
 
       <Adder />
 
-      {open.length > 0 && (
-        <ul class="list" aria-label="Was fehlt">
-          {open.map((it) => (
-            <li class="item" key={it.id}>
-              <button
-                type="button"
-                class="tick"
-                aria-label={`${it.text} in den Korb`}
-                onClick={() => run(ctx.api.toggleCart(it, me))}
-              >
-                <span class="tick__box" />
-              </button>
-              <button type="button" class="item__main" onClick={() => setActionItem(it)}>
-                <span class="item__text">
-                  {it.text}
-                  {it.addedAt > since && it.addedBy !== me && <span class="tag tag--new">neu</span>}
-                </span>
-                <span class="item__meta">
-                  {it.kasse && <span class="tag">Kasse</span>}
-                  {it.claimedBy ? (
-                    <span>{it.claimedBy === me ? 'Du holst das' : `${name(it.claimedBy)} holt das`}</span>
-                  ) : (
-                    <span>
-                      {name(it.addedBy, { cap: true })}, {relTime(it.addedAt, clock.value)}
+      {items.length > 0 && (
+        <ul class="list" aria-label="Einkaufsliste">
+          {items.map((it) => {
+            const inMine = it.state === 'cart' && it.cartBy === me;
+            const inOther = it.state === 'cart' && it.cartBy !== me;
+            let meta;
+            if (inMine) meta = 'In deinem Korb';
+            else if (inOther) meta = `${name(it.cartBy, { cap: true })} hat das im Korb`;
+            else if (it.claimedBy) meta = it.claimedBy === me ? 'Du holst das' : `${name(it.claimedBy)} holt das`;
+            else meta = `${name(it.addedBy, { cap: true })}, ${relTime(it.addedAt, clock.value)}`;
+            return (
+              <li class={`item${inMine ? ' is-mine' : ''}${inOther ? ' is-other' : ''}`} key={it.id}>
+                <button
+                  type="button"
+                  class="tick"
+                  aria-pressed={inMine ? 'true' : 'false'}
+                  aria-label={inOther ? `${it.text}, im Korb von ${name(it.cartBy)}` : `${it.text} abhaken`}
+                  onClick={() => tick(it, inOther)}
+                >
+                  {inOther ? <Magnet id={it.cartBy} size={28} /> : <Box checked={inMine} />}
+                </button>
+                <button type="button" class="item__main" onClick={() => setActionItem(it)}>
+                  <span class="item__line">
+                    <span class="item__word">
+                      {it.text}
+                      {(inMine || inOther) && <Strike muted={inOther} />}
                     </span>
-                  )}
-                </span>
-              </button>
-              {it.claimedBy && <Magnet id={it.claimedBy} size={28} />}
-            </li>
-          ))}
+                    {it.addedAt > since && it.addedBy !== me && !inMine && <span class="tag tag--new">neu</span>}
+                  </span>
+                  <span class="item__meta">{meta}</span>
+                </button>
+                {it.kasse && <span class="tag tag--kasse">Kasse</span>}
+                {it.state === 'open' && it.claimedBy && it.claimedBy !== me && <Magnet id={it.claimedBy} size={28} />}
+              </li>
+            );
+          })}
         </ul>
       )}
 
       {mine.length > 0 && (
-        <Section title="In deinem Korb" id="korb">
-          <ul class="list">
-            {mine.map((it) => (
-              <li class="item is-cart" key={it.id}>
-                <button
-                  type="button"
-                  class="tick is-on"
-                  aria-label={`${it.text} aus dem Korb nehmen`}
-                  onClick={() => run(ctx.api.toggleCart(it, me))}
-                >
-                  <span class="tick__box">
-                    <ICheck size={17} />
-                  </span>
-                </button>
-                <span class="item__main item__main--static">
-                  <span class="item__text">{it.text}</span>
-                  {it.kasse && (
-                    <span class="item__meta">
-                      <span class="tag">Kasse</span>
-                    </span>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
+        <div class="checkout-bar">
           <button type="button" class="btn btn--primary btn--block btn--tall" onClick={() => setCheckout(true)}>
-            Einkauf abschließen
+            Einkauf abschließen ({mine.length})
           </button>
-        </Section>
+        </div>
       )}
-
-      {othersCarts.map(([who, list]) => (
-        <p class="note" key={who}>
-          <Magnet id={who} size={24} />
-          <span>
-            {name(who)} hat im Korb: {list.map((i) => i.text).join(', ')}.
-          </span>
-        </p>
-      ))}
 
       <History />
 
@@ -182,17 +160,32 @@ function Adder() {
         <button
           type="button"
           class="kasse-toggle"
-          aria-pressed={kasse}
+          aria-pressed={kasse ? 'true' : 'false'}
           title="Zahlt die WG-Kasse"
           onClick={() => {
             setKasse(!kasse);
             setTouched(true);
           }}
         >
+          {kasse && (
+            <svg viewBox="0 0 74 48" fill="none" aria-hidden="true">
+              <path
+                class="draw"
+                pathLength="100"
+                d="M10 25 C 8 12, 30 6, 51 8 C 67 10, 69 31, 55 38 C 39 44, 12 41, 9 28 C 8 21, 14 14, 24 12"
+                stroke="var(--red)"
+                stroke-width="2.4"
+                stroke-linecap="round"
+              />
+            </svg>
+          )}
           Kasse
         </button>
-        <button type="submit" class="btn btn--primary btn--square" aria-label="Hinzufügen" disabled={!text.trim()}>
-          <IPlus size={24} />
+        <button type="submit" class="add-btn" aria-label="Hinzufügen" disabled={!text.trim()}>
+          <svg width="42" height="42" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <path d="M20 4 C 30 3, 37 10, 36 20 C 35 30, 28 37, 19 36 C 10 35, 4 28, 5 19 C 6 11, 12 5, 22 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+            <path d="M20 12.5 L20.4 27.5 M12.5 20.2 L27.5 19.6" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+          </svg>
         </button>
       </form>
       {chips.length > 0 && (
@@ -204,7 +197,7 @@ function Adder() {
               key={c}
               onClick={() => add(c, kasseOf.get(c.toLowerCase()) ?? guessKasse(c))}
             >
-              <IPlus size={15} /> {c}
+              + {c}
             </button>
           ))}
         </div>

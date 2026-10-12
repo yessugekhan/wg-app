@@ -6,8 +6,7 @@
     <title>WG</title>
     <meta name="description" content="Einkaufsliste, Geld, Putzplan und Pinnwand für eure WG." />
     <meta name="robots" content="noindex, nofollow" />
-    <meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#14171c" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#e5e6e2" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="WG" />
@@ -20,17 +19,20 @@
       if (/iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
         document.querySelector('link[rel=manifest]').href = './manifest-ios.webmanifest';
       }
+      var theme = 'light';
       try {
         var t = localStorage.getItem('wgapp:theme');
-        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+        if (t === 'dark' || t === 'system') theme = t;
       } catch (e) {}
+      document.documentElement.dataset.theme = theme;
     </script>
     <link rel="icon" href="./icons/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-    <link rel="preload" href="./assets/fonts/atkinson-hyperlegible-next-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="./assets/app-46bc129b81.css" />
+    <link rel="preload" href="./assets/fonts/permanent-marker-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./assets/fonts/barlow-condensed-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="./assets/app-e1cfd19592.css" />
     <script src="./config.js"></script>
-    <script type="module" src="./assets/main-IX4H3TGG.js"></script>
+    <script type="module" src="./assets/main-WYETTA3A.js"></script>
   </head>
   <body>
     <div id="app"></div>

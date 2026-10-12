@@ -1,6 +1,5 @@
 import { screen, route, go, wg, meId, sync, openItems, ctx } from '../state.js';
 import { Magnet, Toasts } from './kit.jsx';
-import { IList, IEuro, IBroom, IPin, ICloudOff } from './icons.jsx';
 import { Start } from './Start.jsx';
 import { Liste } from './Liste.jsx';
 import { Geld } from './Geld.jsx';
@@ -9,10 +8,10 @@ import { Pinnwand, pinnwandBadge } from './Pinnwand.jsx';
 import { WG } from './WG.jsx';
 
 const TAB_UI = [
-  { id: 'liste', label: 'Liste', Icon: IList },
-  { id: 'geld', label: 'Geld', Icon: IEuro },
-  { id: 'putzen', label: 'Putzen', Icon: IBroom },
-  { id: 'pinnwand', label: 'Pinnwand', Icon: IPin },
+  { id: 'liste', label: 'Liste' },
+  { id: 'geld', label: 'Geld' },
+  { id: 'putzen', label: 'Putzen' },
+  { id: 'pinnwand', label: 'Pinnwand' },
 ];
 
 export function App() {
@@ -43,8 +42,8 @@ function Shell() {
 }
 
 function SyncLine() {
-  const { error, offline, pending } = sync.value;
-  let text = null;
+  const { error, offline, pending, fromCache } = sync.value;
+  let text;
   let tone = '';
   if (error === 'permission-denied') {
     text = 'Kein Zugriff auf die Daten';
@@ -55,15 +54,19 @@ function SyncLine() {
   } else if (offline) {
     text = 'Offline, wird später synchronisiert';
     tone = 'is-warn';
-  } else if (pending) {
-    text = 'Speichert …';
   } else if (ctx.kind === 'local') {
     text = 'Demo, nur auf diesem Gerät';
+    tone = 'is-quiet';
+  } else if (pending) {
+    text = 'Speichert …';
+  } else if (fromCache) {
+    text = 'Verbinde …';
+    tone = 'is-quiet';
+  } else {
+    text = 'Alle synchron';
   }
-  if (!text) return null;
   return (
     <span class={`sync ${tone}`} role="status">
-      {(offline || error) && <ICloudOff size={15} />}
       {text}
     </span>
   );
@@ -93,13 +96,15 @@ function TopBar() {
 
 function TabBar() {
   const cur = route.value;
-  const listCount = openItems.value.length;
+  const listCount = openItems.value.filter((i) => i.state === 'open').length;
   const newPosts = pinnwandBadge();
   const dot = putzenDot();
   return (
     <nav class="tabbar" aria-label="Bereiche">
       <div class="tabbar__in">
-        {TAB_UI.map(({ id, label, Icon }) => {
+        <span class="screw screw--l" aria-hidden="true" />
+        <span class="screw screw--r" aria-hidden="true" />
+        {TAB_UI.map(({ id, label }) => {
           let badge = null;
           let sr = '';
           if (id === 'liste' && listCount) {
@@ -111,7 +116,7 @@ function TabBar() {
             sr = `, ${newPosts} neu`;
           }
           if (id === 'putzen' && dot) {
-            badge = <span class="badge badge--dot" />;
+            badge = <span class="badge badge--dot">!</span>;
             sr = ', du bist dran';
           }
           return (
@@ -123,11 +128,11 @@ function TabBar() {
               aria-label={label + sr}
               onClick={() => go(id)}
             >
-              <span class="tab__icon">
-                <Icon size={23} />
+              <span class="tab__led" aria-hidden="true" />
+              <span class="tab__tape" aria-hidden="true">
+                {label}
+                {badge}
               </span>
-              <span class="tab__label">{label}</span>
-              {badge}
             </button>
           );
         })}

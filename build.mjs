@@ -13,11 +13,19 @@ const dist = join(root, 'dist');
 const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
 const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
 const version = `${pkg.version}+${stamp}`;
-const fontDir = join(root, 'node_modules/@fontsource-variable/atkinson-hyperlegible-next/files');
+const fs = (pkg, file) => join(root, 'node_modules/@fontsource', pkg, 'files', file);
+// key in styles.css (__FONT:key__) -> font file
 const FONTS = {
-  latin: 'atkinson-hyperlegible-next-latin-wght-normal.woff2',
-  ext: 'atkinson-hyperlegible-next-latin-ext-wght-normal.woff2',
+  marker: fs('permanent-marker', 'permanent-marker-latin-400-normal.woff2'),
+  bc500: fs('barlow-condensed', 'barlow-condensed-latin-500-normal.woff2'),
+  bc500x: fs('barlow-condensed', 'barlow-condensed-latin-ext-500-normal.woff2'),
+  bc600: fs('barlow-condensed', 'barlow-condensed-latin-600-normal.woff2'),
+  bc600x: fs('barlow-condensed', 'barlow-condensed-latin-ext-600-normal.woff2'),
+  bc700: fs('barlow-condensed', 'barlow-condensed-latin-700-normal.woff2'),
+  bc700x: fs('barlow-condensed', 'barlow-condensed-latin-ext-700-normal.woff2'),
 };
+const PRELOAD = ['marker', 'bc500'];
+const fontName = (key) => FONTS[key].split('/').pop();
 const hash = (buf) => createHash('sha256').update(buf).digest('hex').slice(0, 10);
 
 const common = {
@@ -31,10 +39,12 @@ const common = {
   logLevel: 'warning',
 };
 
-async function css(fontUrls) {
-  const raw = (await readFile(join(root, 'src/styles.css'), 'utf8'))
-    .replace('__FONT_LATIN__', fontUrls.latin)
-    .replace('__FONT_LATIN_EXT__', fontUrls.ext);
+async function css(urlFor) {
+  let raw = await readFile(join(root, 'src/styles.css'), 'utf8');
+  raw = raw.replace(/__FONT:([a-z0-9]+)__/g, (_, key) => {
+    if (!FONTS[key]) throw new Error(`unknown font ${key}`);
+    return urlFor(key);
+  });
   const { code } = await esbuild.transform(raw, { loader: 'css', minify: true, target: ['safari15', 'chrome100'] });
   return code;
 }
@@ -57,8 +67,8 @@ async function buildSite() {
   const jsFiles = Object.keys(result.metafile.outputs).map((p) => p.replace(/^.*docs\//, ''));
   const entry = jsFiles.find((f) => /assets\/main-.*\.js$/.test(f));
 
-  for (const f of Object.values(FONTS)) await copyFile(join(fontDir, f), join(out, 'assets/fonts', f));
-  const cssCode = await css({ latin: `./fonts/${FONTS.latin}`, ext: `./fonts/${FONTS.ext}` });
+  for (const key of Object.keys(FONTS)) await copyFile(FONTS[key], join(out, 'assets/fonts', fontName(key)));
+  const cssCode = await css((key) => `./fonts/${fontName(key)}`);
   const cssName = `assets/app-${hash(cssCode)}.css`;
   await writeFile(join(out, cssName), cssCode);
 
@@ -72,12 +82,13 @@ async function buildSite() {
   const html = (await readFile(join(root, 'public/index.html'), 'utf8'))
     .replace('__CSS__', `./${cssName}`)
     .replace('__JS__', `./${entry}`)
-    .replace('__FONT_PRELOAD__', `./assets/fonts/${FONTS.latin}`)
+    .replace('__FONT_PRELOAD_1__', `./assets/fonts/${fontName(PRELOAD[0])}`)
+    .replace('__FONT_PRELOAD_2__', `./assets/fonts/${fontName(PRELOAD[1])}`)
     .replace('__VERSION__', version);
   await writeFile(join(out, 'index.html'), html);
 
   const precache = ['./', './index.html', './config.js', `./${cssName}`, ...jsFiles.filter((f) => f.endsWith('.js')).map((f) => `./${f}`),
-    ...Object.values(FONTS).map((f) => `./assets/fonts/${f}`), './manifest.webmanifest', './icons/icon-192.png'];
+    ...Object.keys(FONTS).map((key) => `./assets/fonts/${fontName(key)}`), './manifest.webmanifest', './icons/icon-192.png'];
   const sw = (await readFile(join(root, 'src/sw.js'), 'utf8'))
     .replace('__VERSION__', version)
     .replace('__PRECACHE__', JSON.stringify(precache));
@@ -98,10 +109,11 @@ async function buildPreview() {
   });
   const js = result.outputFiles[0].text;
   if (js.includes('firestore.googleapis.com')) throw new Error('preview bundle must not contain Firebase');
-  const b64 = async (f) => `data:font/woff2;base64,${(await readFile(join(fontDir, f))).toString('base64')}`;
+  const b64 = {};
+  for (const key of Object.keys(FONTS)) b64[key] = `data:font/woff2;base64,${(await readFile(FONTS[key])).toString('base64')}`;
   // the artifact frame already pads the page by the safe areas, so the sticky bar must not add them again
-  const frameCss = '.topbar{top:env(safe-area-inset-top,0px);padding-top:0}.start{padding-top:36px}.app{min-height:100%}';
-  const cssCode = (await css({ latin: await b64(FONTS.latin), ext: await b64(FONTS.ext) })) + frameCss;
+  const frameCss = '.topbar{top:env(safe-area-inset-top,0px);padding-top:0}.app{min-height:100%}';
+  const cssCode = (await css((key) => b64[key])) + frameCss;
   const page = `<title>WG-App Demo</title>
 <meta name="description" content="Einkaufsliste, Geld, Putzplan und Pinnwand für eine WG, als Demo auf diesem Gerät.">
 <style>${cssCode}</style>
