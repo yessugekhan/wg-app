@@ -1,6 +1,6 @@
 // Offline shell for the WG-App. Data itself is cached by Firestore (IndexedDB), not here.
-const VERSION = 'wg-1.0.0+202610121302';
-const PRECACHE = ["./","./index.html","./config.js","./assets/app-f43071d208.css","./assets/main-6QGRCRGA.js","./assets/chunk-JJV3RC4A.js","./assets/chunk-4GELXGZE.js","./assets/fonts/shantell-sans-latin-700-normal.woff2","./assets/fonts/shantell-sans-latin-ext-700-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-400-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-400-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-600-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-600-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-700-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-700-normal.woff2","./assets/doodles-light-86d1adbe35.svg","./assets/doodles-dark-f114675faa.svg","./manifest.webmanifest","./icons/icon-192.png"];
+const VERSION = 'wg-1.0.0+202610121312';
+const PRECACHE = ["./","./index.html","./config.js","./assets/app-de0eeae81b.css","./assets/main-3PO3C42A.js","./assets/chunk-JJV3RC4A.js","./assets/chunk-4GELXGZE.js","./assets/fonts/shantell-sans-latin-700-normal.woff2","./assets/fonts/shantell-sans-latin-ext-700-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-400-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-400-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-600-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-600-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-700-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-700-normal.woff2","./assets/doodles-light-86d1adbe35.svg","./assets/doodles-dark-f114675faa.svg","./manifest.webmanifest","./icons/icon-192.png"];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -18,6 +18,11 @@ self.addEventListener('activate', (event) => {
       .then((keys) => Promise.all(keys.filter((k) => k.startsWith('wg-') && k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
+});
+
+// pages ask which version took over, to offer a reload when it is newer than what they run
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'version?') event.source?.postMessage({ type: 'version', version: VERSION });
 });
 
 const networkFirst = async (request, fallbackKey) => {

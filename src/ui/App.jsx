@@ -1,5 +1,7 @@
-import { screen, route, go, wg, meId, sync, openItems, ctx, toast } from '../state.js';
+import { useState } from 'preact/hooks';
+import { screen, route, go, wg, meId, sync, openItems, ctx, toast, updateReady } from '../state.js';
 import { Magnet, Toasts } from './kit.jsx';
+import { IX } from './icons.jsx';
 import { Start } from './Start.jsx';
 import { Liste } from './Liste.jsx';
 import { Geld } from './Geld.jsx';
@@ -19,8 +21,26 @@ export function App() {
   return (
     <>
       {s === 'app' ? <Shell /> : <Start screen={s} />}
+      <UpdateBar />
       <Toasts />
     </>
+  );
+}
+
+/** "Neue Version ist da": one tap loads it. Dismissable, e.g. while someone is typing. */
+function UpdateBar() {
+  const [later, setLater] = useState(false);
+  if (!updateReady.value || later) return null;
+  return (
+    <div class="update-bar" role="status">
+      <span class="update-bar__text">Eine neue Version der App ist da.</span>
+      <button type="button" class="update-bar__go" onClick={() => location.reload()}>
+        Neu laden
+      </button>
+      <button type="button" class="update-bar__x" aria-label="Später" onClick={() => setLater(true)}>
+        <IX size={18} />
+      </button>
+    </div>
   );
 }
 

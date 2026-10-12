@@ -20,6 +20,11 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// pages ask which version took over, to offer a reload when it is newer than what they run
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'version?') event.source?.postMessage({ type: 'version', version: VERSION });
+});
+
 const networkFirst = async (request, fallbackKey) => {
   const cache = await caches.open(VERSION);
   try {

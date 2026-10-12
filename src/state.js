@@ -64,6 +64,8 @@ export const visitSeen = signal({});
 export const toasts = signal([]);
 export const theme = signal(readLS('wgapp:theme') || 'light');
 export const installPrompt = signal(null);
+/** A newer version of the app took over in the background; the page offers a reload. */
+export const updateReady = signal(false);
 
 // ---------------------------------------------------------------- derived
 

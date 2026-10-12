@@ -16,6 +16,7 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
 // The built site carries the real Firebase config; the walkthrough runs it in demo mode,
 // except under /live/, which serves the real config to check the join and connect screens.
 const DEMO_CONFIG = 'window.WG_CONFIG = { firebase: null };';
+let swVersion = null; // set by the test to pretend a newer version was deployed
 const server = http.createServer(async (req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   const live = p.startsWith('/live/');
@@ -23,6 +24,12 @@ const server = http.createServer(async (req, res) => {
   if (p === '/config.js' && !live) {
     res.writeHead(200, { 'content-type': 'text/javascript' });
     res.end(DEMO_CONFIG);
+    return;
+  }
+  if (p === '/sw.js' && swVersion) {
+    const sw = (await readFile(join(root, 'docs/sw.js'), 'utf8')).replace(/const VERSION = '[^']*'/, `const VERSION = '${swVersion}'`);
+    res.writeHead(200, { 'content-type': 'text/javascript' });
+    res.end(sw);
     return;
   }
   if (p.endsWith('/')) p += 'index.html';
@@ -407,6 +414,19 @@ try {
   s = await state(page);
   assert.ok(Object.values(s.chores).every((c) => c.rotation.includes(deniz)), 'Deniz back in every rotation');
   log('member moved out and back in, rotations follow');
+
+  // a new version goes live while the app is open: a bar offers the reload
+  await page.waitForFunction(() => !!navigator.serviceWorker?.controller, { timeout: 10000, polling: 100 });
+  assert.equal(await page.$('.update-bar'), null, 'no bar while nothing changed');
+  swVersion = 'wg-e2e-next';
+  await page.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r.update()).then(() => true));
+  await page.waitForSelector('.update-bar', { visible: true, timeout: 15000 });
+  await shot(page, '18-neue-version');
+  await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), click(page, '.update-bar__go', 'Neu laden')]);
+  await waitHeadline(page, 'WG Martinsviertel');
+  await new Promise((r) => setTimeout(r, 600));
+  assert.equal(await page.$('.update-bar'), null, 'no bar after the reload');
+  log('new version while open: "Neu laden" bar, gone after the reload');
 
   // ------------------------------------------------------------------ fresh WG via setup, small phone
   const ctx2 = await browser.createBrowserContext();
