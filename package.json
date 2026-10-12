@@ -12,8 +12,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@fontsource/barlow-condensed": "^5.3.0",
-    "@fontsource/permanent-marker": "^5.3.0",
+    "@fontsource/atkinson-hyperlegible-next": "^5.3.0",
+    "@fontsource/shantell-sans": "^5.3.0",
     "@preact/signals": "^2.11.3",
     "firebase": "^13.0.0",
     "preact": "^11.0.1",
@@ -22,6 +22,7 @@
   "devDependencies": {
     "@sparticuz/chromium": "^153.0.0",
     "esbuild": "^0.28.2",
-    "puppeteer-core": "^25.13.0"
+    "puppeteer-core": "^25.13.0",
+    "roughjs": "^4.6.6"
   }
 }

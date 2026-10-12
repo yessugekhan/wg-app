@@ -1,62 +1,78 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import {
-  ctx, summary, balances, transferPlan, activeMembers, members, meId, txs, txsReady, txLimit, wg,
-  boughtItems, name, nameDat, nameAcc, joinNames, run, toast, clock, sync,
+  ctx, summary, balances, debts, activeMembers, members, meId, txs, txsReady, txLimit, wg, pendingForm,
+  boughtItems, name, nameDat, joinNames, run, toast, clock, sync,
 } from '../state.js';
 import {
   KASSE, formatMoney, parseMoney, splitEvenly, monthKey, monthLabel, shiftMonth, dayKey, dayLabel, relTime,
-  computeSummary, summariesEqual,
+  computeSummary, summariesEqual, summaryOf, debtReasons,
 } from '../model.js';
 import { Headline, Section, Sheet, Magnet, KasseMagnet, People, MoneyInput, Field, Segmented, Confirm, Empty } from './kit.jsx';
 import { IPlus, ICart, IReceipt, ISwap, IJar, IScale, ICheck, IRefresh } from './icons.jsx';
 
+const sumOf = (list) => list.reduce((a, d) => a + d.amount, 0);
+
+/** "Du schuldest Simon 3,50 €." – the sentence that answers "what do I have to do?" */
+function moneyHeadline(me, list) {
+  const owe = list.filter((d) => d.from === me);
+  const get = list.filter((d) => d.to === me);
+  const sub = [];
+  let head;
+  if (owe.length === 1) head = `Du schuldest ${name(owe[0].to)} ${formatMoney(owe[0].amount)}.`;
+  else if (owe.length === 2) head = `Du schuldest ${name(owe[0].to)} ${formatMoney(owe[0].amount)} und ${name(owe[1].to)} ${formatMoney(owe[1].amount)}.`;
+  else if (owe.length > 2) head = `Du schuldest ${owe.length} Leuten zusammen ${formatMoney(sumOf(owe))}.`;
+  else if (get.length === 1) head = `${name(get[0].from, { cap: true })} schuldet dir ${formatMoney(get[0].amount)}.`;
+  else if (get.length > 1) head = `Du bekommst ${formatMoney(sumOf(get))} von ${get.length} Leuten.`;
+  else head = 'Du bist mit allen quitt.';
+  if (owe.length && get.length) {
+    sub.push(get.length === 1
+      ? `Dafür schuldet dir ${name(get[0].from)} ${formatMoney(get[0].amount)}.`
+      : `Dafür bekommst du ${formatMoney(sumOf(get))} von ${get.length} Leuten.`);
+  }
+  return { head, sub };
+}
+
 export function Geld() {
   const me = meId.value;
-  const bal = balances.value;
-  const my = bal[me] || 0;
-  const plan = transferPlan.value;
+  const list = debts.value;
   const kasse = summary.value?.kasse || 0;
   const [form, setForm] = useState(null); // { mode, tx? }
   const [detail, setDetail] = useState(null);
   const [settle, setSettle] = useState(null);
+  const [debt, setDebt] = useState(null);
 
-  const mine = plan.filter((p) => p.from === me || p.to === me);
-  const sub = mine.slice(0, 3).map((p) =>
-    p.from === me ? `Du zahlst ${name(p.to)} ${formatMoney(p.amount)}.` : `${name(p.from, { cap: true })} zahlt dir ${formatMoney(p.amount)}.`,
-  );
-  if (mine.length > 3) sub.push(`Und ${mine.length - 3} weitere Zahlungen.`);
-  if (!mine.length) sub.push(`In der Kasse ${kasse === 1 || kasse === -1 ? 'ist' : 'sind'} ${formatMoney(kasse)}.`);
+  // "Einkauf eintragen" on the Liste tab lands here with the form already open
+  useEffect(() => {
+    if (pendingForm.value) {
+      setForm(pendingForm.value);
+      pendingForm.value = null;
+    }
+  }, [pendingForm.value]);
+
+  const { head, sub } = moneyHeadline(me, list);
+  sub.push(`In der Kasse ${kasse === 100 || kasse === -100 ? 'ist' : 'sind'} ${formatMoney(kasse)}.`);
+  const mine = list.filter((d) => d.from === me || d.to === me);
+  const others = list.filter((d) => d.from !== me && d.to !== me);
 
   return (
     <>
-      <Headline sub={sub.join(' ')}>
-        {my > 0 ? `Du bekommst ${formatMoney(my)}.` : my < 0 ? `Du schuldest ${formatMoney(-my)}.` : 'Du bist ausgeglichen.'}
-      </Headline>
+      <Headline sub={sub.join(' ')}>{head}</Headline>
 
       <Consistency />
 
-      {plan.length > 0 && (
-        <Section title="So wird ausgeglichen" id="ausgleich">
+      <Section title="Wer schuldet wem?" id="schulden">
+        {summary.value && !summary.value.v ? (
+          <p class="section__text">Die Schulden pro Person werden gerade aus allen Buchungen berechnet …</p>
+        ) : list.length ? (
           <ul class="list">
-            {plan.map((p) => (
-              <li class={`row${p.from === me || p.to === me ? ' is-mine' : ''}`} key={`${p.from}-${p.to}`}>
-                <span class="pair">
-                  <Magnet id={p.from} size={30} />
-                  <Magnet id={p.to} size={30} />
-                </span>
-                <span class="row__main">
-                  {p.from === me ? 'Du zahlst ' : `${name(p.from)} zahlt `}
-                  <strong>{p.to === me ? 'dir' : name(p.to)}</strong>
-                  <span class="amount row__amount">{formatMoney(p.amount)}</span>
-                </span>
-                <button type="button" class="btn btn--small" onClick={() => setSettle(p)}>
-                  Bezahlt
-                </button>
-              </li>
+            {[...mine, ...others].map((d) => (
+              <DebtRow key={`${d.from}-${d.to}`} d={d} onOpen={() => setDebt(d)} onSettle={() => setSettle(d)} />
             ))}
           </ul>
-        </Section>
-      )}
+        ) : (
+          <p class="section__text">Niemand schuldet jemandem etwas. Wenn jemand etwas für alle kauft, steht hier, wer wem wie viel zurückgeben muss.</p>
+        )}
+      </Section>
 
       <KasseSection onDeposit={() => setForm({ mode: 'deposit' })} />
 
@@ -66,8 +82,8 @@ export function Geld() {
         <TxList onOpen={setDetail} />
       </Section>
 
-      <button type="button" class="fab" aria-label="Neue Buchung" onClick={() => setForm({ mode: 'expense' })}>
-        <IPlus size={28} />
+      <button type="button" class="fab" onClick={() => setForm({ mode: 'expense' })}>
+        <IPlus size={24} /> Ausgabe
       </button>
 
       {form && <TxForm init={form} onClose={() => setForm(null)} />}
@@ -81,9 +97,147 @@ export function Geld() {
           }}
         />
       )}
+      {debt && (
+        <DebtSheet
+          d={list.find((x) => x.from === debt.from && x.to === debt.to) || { ...debt, amount: 0 }}
+          onClose={() => setDebt(null)}
+          onSettle={(d) => {
+            setDebt(null);
+            setSettle(d);
+          }}
+          onOpenTx={(t) => {
+            setDebt(null);
+            setDetail(t);
+          }}
+        />
+      )}
       {settle && <SettleSheet plan={settle} onClose={() => setSettle(null)} />}
     </>
   );
+}
+
+/** "Felix schuldet dir" / "Du schuldest Simon" / "Felix schuldet Simon". */
+function debtSentence(d, me) {
+  if (d.from === me) return ['Du schuldest ', name(d.to)];
+  if (d.to === me) return [`${name(d.from)} schuldet `, 'dir'];
+  return [`${name(d.from)} schuldet `, name(d.to)];
+}
+
+/** Titles of the purchases behind a debt: "für Ofenhandschuhe und Pizza". */
+function reasonLine(d) {
+  const { items, complete } = debtReasons(txs.value, d.from, d.to, d.amount);
+  const titles = [];
+  for (const it of items) if (it.delta > 0 && !titles.includes(txTitle(it.tx))) titles.push(txTitle(it.tx));
+  if (!titles.length) return complete ? '' : 'Antippen für Details';
+  if (titles.length <= 2) return `für ${joinNames(titles)}`;
+  return `für ${titles.slice(0, 2).join(', ')} und ${titles.length - 2} weitere`;
+}
+
+function DebtRow({ d, onOpen, onSettle }) {
+  const me = meId.value;
+  const [lead, who] = debtSentence(d, me);
+  const why = reasonLine(d);
+  return (
+    <li class={`row debt${d.from === me || d.to === me ? ' is-mine' : ''}`}>
+      <button type="button" class="debt__main" onClick={onOpen}>
+        <span class="pair">
+          <Magnet id={d.from} size={30} />
+          <Magnet id={d.to} size={30} />
+        </span>
+        <span class="row__main">
+          <span class="debt__text">
+            {lead}
+            <strong>{who}</strong>
+          </span>
+          <span class="amount row__amount">{formatMoney(d.amount)}</span>
+          {why && <span class="debt__why">{why}</span>}
+        </span>
+      </button>
+      <button type="button" class="btn btn--small" onClick={onSettle}>
+        {d.to === me ? 'Erhalten' : 'Bezahlt'}
+      </button>
+    </li>
+  );
+}
+
+/** One debt, explained booking by booking. */
+function DebtSheet({ d, onClose, onSettle, onOpenTx }) {
+  const me = meId.value;
+  const { items, complete } = debtReasons(txs.value, d.from, d.to, d.amount);
+  const [lead, who] = debtSentence(d, me);
+  const title = d.from === me ? `Du und ${name(d.to)}` : d.to === me ? `${name(d.from, { cap: true })} und du` : `${name(d.from)} und ${name(d.to)}`;
+  return (
+    <Sheet
+      open
+      title={title}
+      onClose={onClose}
+      footer={
+        d.amount > 0 && (
+          <>
+            <button type="button" class="btn btn--quiet" onClick={onClose}>
+              Schließen
+            </button>
+            <button type="button" class="btn btn--primary" onClick={() => onSettle(d)}>
+              {d.to === me ? 'Geld erhalten' : 'Zurückgezahlt'}
+            </button>
+          </>
+        )
+      }
+    >
+      {d.amount > 0 ? (
+        <p class="sheet__text">
+          {lead}
+          {who} <strong class="amount">{formatMoney(d.amount)}</strong>. So kommt das zustande:
+        </p>
+      ) : (
+        <p class="sheet__text">Hier ist alles beglichen.</p>
+      )}
+      {items.length > 0 && (
+        <ul class="reasons">
+          {items.map(({ tx, delta }) => (
+            <li key={tx.id}>
+              <button type="button" class="reason" onClick={() => onOpenTx(tx)}>
+                <span class="reason__main">
+                  <span class="reason__title">{txTitle(tx)}</span>
+                  <span class="reason__sub">
+                    {dayLabel(tx.date, new Date(clock.value))} · {reasonSentence(tx, d.from, d.to)}
+                  </span>
+                </span>
+                <span class="reason__amt">
+                  {delta > 0 ? '+' : '−'}
+                  {formatMoney(Math.abs(delta))}
+                </span>
+              </button>
+            </li>
+          ))}
+          <li class="reasons__total">
+            <span>Offen</span>
+            <span class="amount">{formatMoney(d.amount)}</span>
+          </li>
+        </ul>
+      )}
+      {!complete && (
+        <button type="button" class="btn btn--block more" onClick={() => (txLimit.value += 100)}>
+          Ältere Buchungen laden
+        </button>
+      )}
+    </Sheet>
+  );
+}
+
+/** What one booking did between debtor a and creditor b. */
+function reasonSentence(tx, a, b) {
+  if (tx.type === 'transfer') {
+    return tx.from === a ? `${name(a, { cap: true })} ${a === meId.value ? 'hast' : 'hat'} ${formatMoney(tx.amount)} zurückgegeben` : `${name(b, { cap: true })} ${b === meId.value ? 'hast' : 'hat'} ${formatMoney(tx.amount)} gegeben`;
+  }
+  if (tx.type === 'expense') {
+    const shares = splitEvenly(tx.amount, tx.split?.length ? tx.split : [tx.paidBy]);
+    const other = tx.paidBy === b ? a : b;
+    const verb = tx.paidBy === meId.value ? 'hast' : 'hat';
+    const share = other === meId.value ? `dein Anteil ${formatMoney(shares[other] || 0)}` : `Anteil von ${name(other)} ${formatMoney(shares[other] || 0)}`;
+    return `${name(tx.paidBy, { cap: true })} ${verb} ${formatMoney(tx.amount)} bezahlt, ${share}`;
+  }
+  return '';
 }
 
 function KasseSection({ onDeposit }) {
@@ -182,16 +336,26 @@ function forWhom(split) {
   return `für ${joinNames(names)}`;
 }
 
+/** "je 3,50 €" (or "je ca. 3,33 €" when the cents do not split evenly). */
+export function perPerson(t) {
+  const ids = t.split?.length ? t.split : [t.paidBy];
+  if (ids.length < 2) return '';
+  const v = Object.values(splitEvenly(t.amount, ids));
+  return Math.min(...v) === Math.max(...v) ? `je ${formatMoney(v[0])}` : `je ca. ${formatMoney(Math.round(t.amount / ids.length))}`;
+}
+
 export function txSentence(t) {
   const me = meId.value;
   switch (t.type) {
-    case 'expense':
+    case 'expense': {
       if (t.paidBy === KASSE) return 'Aus der Kasse bezahlt';
-      return `${name(t.paidBy, { cap: true })} ${t.paidBy === me ? 'hast' : 'hat'} bezahlt, ${forWhom(t.split)}`;
+      const per = perPerson(t);
+      return `${name(t.paidBy, { cap: true })} ${t.paidBy === me ? 'hast' : 'hat'} bezahlt, ${forWhom(t.split)}${per ? `, ${per}` : ''}`;
+    }
     case 'deposit':
       return `${name(t.member, { cap: true })} ${t.member === me ? 'hast' : 'hat'} eingezahlt`;
     case 'transfer':
-      return `${name(t.from, { cap: true })} an ${nameAcc(t.to)}`;
+      return `${name(t.from, { cap: true })} ${t.from === me ? 'hast' : 'hat'} ${t.to === me ? 'dir' : name(t.to)} Geld gegeben`;
     case 'adjust':
       return 'Kassenstand angepasst';
     default:
@@ -267,9 +431,8 @@ function TxList({ onOpen }) {
 /** Warns when the running totals and the transactions disagree (only checkable when all are loaded). */
 function Consistency() {
   const [busy, setBusy] = useState(false);
-  if (!txsReady.value || txs.value.length >= txLimit.value || sync.value.pending || !summary.value) return null;
-  const s = summary.value;
-  const ok = summariesEqual({ balances: s.balances || {}, kasse: s.kasse || 0, contrib: s.contrib || {} }, computeSummary(txs.value));
+  if (!txsReady.value || txs.value.length >= txLimit.value || sync.value.pending || !summary.value || !summary.value.v) return null;
+  const ok = summariesEqual(summaryOf(summary.value), computeSummary(txs.value));
   if (ok) return null;
   return (
     <div class="notice" role="alert">
@@ -293,6 +456,15 @@ function Consistency() {
       </button>
     </div>
   );
+}
+
+/** One line of the split on the receipt: who owes the payer how much because of this booking. */
+function shareLine(id, payer) {
+  const me = meId.value;
+  if (id === payer) return id === me ? 'Dein eigener Anteil' : `Eigener Anteil von ${name(id)}`;
+  if (id === me) return `Du schuldest ${name(payer)}`;
+  if (payer === me) return `${name(id)} schuldet dir`;
+  return `${name(id)} schuldet ${name(payer)}`;
 }
 
 function TxDetail({ tx, onClose, onEdit }) {
@@ -322,10 +494,10 @@ function TxDetail({ tx, onClose, onEdit }) {
           <div class="receipt__total">{formatMoney(tx.amount, { signed: tx.type === 'adjust' })}</div>
           <p class="receipt__line">{txSentence(tx)}.</p>
           {shares && (
-            <ul class="receipt__shares">
+            <ul class="receipt__shares" aria-label="Aufteilung">
               {Object.entries(shares).map(([id, v]) => (
                 <li key={id} class={id === me ? 'is-me' : ''}>
-                  <span>{id === me ? 'Dein Anteil' : `Anteil ${name(id)}`}</span>
+                  <span>{shareLine(id, tx.paidBy)}</span>
                   <span class="amount">{formatMoney(v)}</span>
                 </li>
               ))}
@@ -360,6 +532,7 @@ function SettleSheet({ plan, onClose }) {
   const cents = parseMoney(amount);
   const err = !cents || cents <= 0 ? 'Bitte einen Betrag wie 12,40 eingeben.' : null;
   const fromText = plan.from === me ? 'Du hast' : `${name(plan.from)} hat`;
+  const full = formatMoney(plan.amount);
   return (
     <Sheet
       open
@@ -387,7 +560,7 @@ function SettleSheet({ plan, onClose }) {
       }
     >
       <p class="sheet__text">
-        {fromText} {plan.to === me ? 'dir' : name(plan.to)} Geld gegeben? Bei einer Teilzahlung einfach den Betrag ändern.
+        {fromText} {plan.to === me ? 'dir' : name(plan.to)} {full} gegeben? Bei einer Teilzahlung einfach den Betrag ändern.
       </p>
       <Field label="Betrag" error={tried && err}>
         <MoneyInput value={amount} onInput={setAmount} autofocus label="Betrag" />
@@ -467,9 +640,12 @@ function TxForm({ init, onClose }) {
   const [month, setMonth] = useState(editing ? editing.month || '' : monthly ? cur : '');
   const [from, setFrom] = useState(editing?.from || me);
   const [to, setTo] = useState(editing?.to || allIds.find((id) => id !== me) || me);
+  const [perHeadMode, setPerHeadMode] = useState(false); // amount typed per person ("jeder 3,50 €")
   const [tried, setTried] = useState(false);
 
-  const cents = parseMoney(amount);
+  const typed = parseMoney(amount);
+  const perMode = mode === 'expense' && paidBy !== KASSE && perHeadMode;
+  const cents = perMode && typed > 0 ? typed * Math.max(1, split.length) : typed;
   const errors = {};
   if (mode !== 'adjust' && (!cents || cents <= 0)) errors.amount = 'Bitte einen Betrag wie 12,40 eingeben.';
   if (mode === 'adjust' && !cents) errors.amount = 'Bitte einen Betrag eingeben.';
@@ -503,10 +679,27 @@ function TxForm({ init, onClose }) {
   };
 
   const shares = mode === 'expense' && paidBy !== KASSE && cents > 0 && split.length ? Object.values(splitEvenly(cents, split)) : [];
-  const perHead = shares.length
+  let perHead = shares.length
     ? Math.min(...shares) === Math.max(...shares)
       ? `${formatMoney(shares[0])} pro Person`
       : `${formatMoney(Math.min(...shares))} bis ${formatMoney(Math.max(...shares))} pro Person`
+    : null;
+  if (perMode && cents > 0 && split.length) perHead = `Zusammen ${formatMoney(cents)} für ${split.length === 1 ? '1 Person' : `${split.length} Leute`}`;
+  // the sentence everybody understands: who owes the payer how much
+  const owesLine = mode === 'expense' && paidBy !== KASSE && cents > 0 && split.length
+    ? (() => {
+        const sh = splitEvenly(cents, split);
+        const debtors = split.filter((id) => id !== paidBy);
+        if (!debtors.length) return null;
+        const each = debtors.map((id) => sh[id]);
+        const same = Math.min(...each) === Math.max(...each);
+        const othersAll = allIds.filter((id) => id !== paidBy);
+        const from = debtors.length > 2 && othersAll.every((id) => debtors.includes(id))
+          ? 'allen anderen'
+          : joinNames(debtors.map((id) => (id === me ? 'dir' : name(id))));
+        const what = debtors.length === 1 ? formatMoney(each[0]) : same ? `je ${formatMoney(each[0])}` : `je ca. ${formatMoney(Math.round(cents / split.length))}`;
+        return `Danach ${paidBy === me ? 'bekommst du' : `bekommt ${name(paidBy)}`} von ${from} ${what}.`;
+      })()
     : null;
   const months = [shiftMonth(cur, -1), cur, shiftMonth(cur, 1)];
   const titleFor = { expense: 'Ausgabe', deposit: 'Einzahlung', transfer: 'Rückzahlung', adjust: 'Kassenstand' };
@@ -549,8 +742,19 @@ function TxForm({ init, onClose }) {
           <Field label="Wofür?" error={tried && errors.title}>
             <input class="input" type="text" value={title} placeholder="z. B. Wocheneinkauf, Pizza, Internet" onInput={(e) => setTitle(e.currentTarget.value)} data-autofocus />
           </Field>
-          <Field label="Betrag" error={tried && errors.amount} hint={perHead}>
-            <MoneyInput value={amount} onInput={setAmount} label="Betrag" />
+          {paidBy !== KASSE && !editing && (
+            <Segmented
+              label="Betrag gilt"
+              value={perHeadMode}
+              onChange={setPerHeadMode}
+              options={[
+                { value: false, label: 'Gesamtbetrag' },
+                { value: true, label: 'Pro Person' },
+              ]}
+            />
+          )}
+          <Field label={perMode ? 'Betrag pro Person' : 'Betrag'} error={tried && errors.amount} hint={perHead}>
+            <MoneyInput value={amount} onInput={setAmount} label={perMode ? 'Betrag pro Person' : 'Betrag'} />
           </Field>
           <Field group label="Bezahlt von">
             <People kasse list={people} value={paidBy} onChange={setPaidBy} label="Bezahlt von" />
@@ -558,7 +762,7 @@ function TxForm({ init, onClose }) {
           {paidBy === KASSE ? (
             <p class="sheet__hint">Wird vom Kassenstand abgezogen und gilt für alle.</p>
           ) : (
-            <Field group label="Für wen?" error={tried && errors.split}>
+            <Field group label="Für wen?" error={tried && errors.split} hint={owesLine}>
               <People multi list={people} value={split} onChange={setSplit} label="Für wen?" />
             </Field>
           )}

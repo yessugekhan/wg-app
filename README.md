@@ -4,19 +4,20 @@ Einkaufsliste, Geld, Putzplan und Pinnwand für eine WG. Läuft im Browser, läs
 
 ## Was sie kann
 
-- **Liste**: Was fehlt, wer es holt, was gerade jemand im Korb hat (live). Haushaltszeug wie Klopapier oder Spülmittel wird automatisch als „Kasse“ markiert.
+- **Liste**: Was fehlt, wer es holt, was gerade jemand im Korb hat (live). Haushaltszeug wie Klopapier oder Spülmittel wird automatisch als „Kasse“ markiert. Darunter Woche für Woche, wer wann was gekauft hat.
 - **Einkauf abschließen**: Betrag vom Bon eintippen, fertig. Kassen-Sachen gehen von der WG-Kasse ab, der Rest wird auf alle (oder ausgewählte Leute) aufgeteilt.
-- **Geld**: Wer wem wie viel schuldet, mit möglichst wenigen Überweisungen ausgeglichen. WG-Kasse mit Monatsbeiträgen, Kassenstand korrigieren, jede Buchung bearbeitbar.
-- **Putzen**: Rotierender Putzplan (wöchentlich, alle 2 oder 4 Wochen), Tauschen für eine Woche, Nachtragen, Statistik der letzten 8 Wochen.
+- **Geld**: Wer wem wie viel schuldet, Person für Person und mit den Einkäufen, aus denen es kommt („Du schuldest Simon 3,50 € für Ofenhandschuhe“). Beträge gesamt oder pro Person eintragen. WG-Kasse mit Monatsbeiträgen, Kassenstand korrigieren, jede Buchung bearbeitbar.
+- **Putzen**: Rotierender Putzplan (wöchentlich, alle 2 oder 4 Wochen), Tauschen für eine Woche, Nachtragen, Verlauf „wer hat wann geputzt“, Statistik der letzten 8 Wochen. Wochen heißen wie an der TU Darmstadt („3. Vorlesungswoche“, „Weihnachtspause“, „Semesterferien“), die Termine stehen in `SEMESTERS` in `src/model.js`.
 - **Pinnwand**: Nachrichten an alle, anheften, „gesehen“-Markierung.
-- Offline nutzbar: Änderungen werden synchronisiert, sobald wieder Netz da ist.
+- Offline nutzbar: Änderungen werden synchronisiert, sobald wieder Netz da ist. Der Punkt neben dem WG-Namen zeigt den Stand (grün: alles gespeichert, gelb: offline, grau: verbindet, rot: Problem); Antippen erklärt ihn.
 
 ## Technik
 
 - Statische Seite (Preact, esbuild) in `docs/`, gehostet über GitHub Pages.
 - Daten in Firebase Firestore (kostenloser Spark-Tarif reicht), alles unter `wgs/<WG-Code>/…`.
-- Salden werden bei jeder Buchung atomar mitgeführt (`meta/summary`), damit die App nicht jedes Mal alle Buchungen lesen muss. „Salden neu berechnen“ in den Einstellungen baut sie aus allen Buchungen neu auf.
-- Schrift: Atkinson Hyperlegible Next, selbst gehostet (kein Google-Fonts-Abruf).
+- Salden und Schulden pro Personenpaar werden bei jeder Buchung atomar mitgeführt (`meta/summary`), damit die App nicht jedes Mal alle Buchungen lesen muss. „Salden neu berechnen“ in den Einstellungen baut sie aus allen Buchungen neu auf; ältere Zusammenfassungen ohne Paar-Schulden werden beim ersten Öffnen automatisch neu berechnet.
+- Schrift: Atkinson Hyperlegible Next für Text, Shantell Sans für Überschriften, beide selbst gehostet (kein Google-Fonts-Abruf).
+- Hintergrund: Marker-Kritzeleien als SVG-Kachel, gezeichnet von `tools/doodles.mjs` (rough.js).
 
 ## Einrichten
 

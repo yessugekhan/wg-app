@@ -1,6 +1,6 @@
 // Offline shell for the WG-App. Data itself is cached by Firestore (IndexedDB), not here.
-const VERSION = 'wg-1.0.0+202610121053';
-const PRECACHE = ["./","./index.html","./config.js","./assets/app-e1cfd19592.css","./assets/main-WYETTA3A.js","./assets/chunk-EKDC6YXR.js","./assets/chunk-GEWU5KFR.js","./assets/fonts/permanent-marker-latin-400-normal.woff2","./assets/fonts/barlow-condensed-latin-500-normal.woff2","./assets/fonts/barlow-condensed-latin-ext-500-normal.woff2","./assets/fonts/barlow-condensed-latin-600-normal.woff2","./assets/fonts/barlow-condensed-latin-ext-600-normal.woff2","./assets/fonts/barlow-condensed-latin-700-normal.woff2","./assets/fonts/barlow-condensed-latin-ext-700-normal.woff2","./manifest.webmanifest","./icons/icon-192.png"];
+const VERSION = 'wg-1.0.0+202610121154';
+const PRECACHE = ["./","./index.html","./config.js","./assets/app-6525f50524.css","./assets/main-HGAF6SNF.js","./assets/chunk-X4LTRB2N.js","./assets/chunk-7CSHWLHZ.js","./assets/fonts/shantell-sans-latin-700-normal.woff2","./assets/fonts/shantell-sans-latin-ext-700-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-400-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-400-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-600-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-600-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-700-normal.woff2","./assets/fonts/atkinson-hyperlegible-next-latin-ext-700-normal.woff2","./assets/doodles-light-86d1adbe35.svg","./assets/doodles-dark-f114675faa.svg","./manifest.webmanifest","./icons/icon-192.png"];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

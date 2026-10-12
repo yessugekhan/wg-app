@@ -1,64 +1,76 @@
-/* WG-App "Setliste": a handwritten setlist on white paper, gaffer tape, a rehearsal-room floor,
+/* WG-App "Setliste": a setlist on white paper, gaffer tape, a rehearsal-room wall full of doodles,
    and a mixing-desk strip with masking-tape labels as the tab bar. */
 
+/* text: Atkinson Hyperlegible Next (made for legibility), headlines: Shantell Sans (a readable marker hand) */
 @font-face {
-  font-family: 'PM';
+  font-family: 'WGHand';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(__FONT:hand__) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'WGHand';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(__FONT:handx__) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
+    U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'WGText';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url(__FONT:marker__) format('woff2');
-}
-@font-face {
-  font-family: 'BC';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url(__FONT:bc500__) format('woff2');
+  src: url(__FONT:ui400__) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'BC';
+  font-family: 'WGText';
   font-style: normal;
-  font-weight: 500;
+  font-weight: 400;
   font-display: swap;
-  src: url(__FONT:bc500x__) format('woff2');
+  src: url(__FONT:ui400x__) format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
     U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
-  font-family: 'BC';
+  font-family: 'WGText';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url(__FONT:bc600__) format('woff2');
+  src: url(__FONT:ui600__) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'BC';
+  font-family: 'WGText';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url(__FONT:bc600x__) format('woff2');
+  src: url(__FONT:ui600x__) format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
     U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
-  font-family: 'BC';
+  font-family: 'WGText';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url(__FONT:bc700__) format('woff2');
+  src: url(__FONT:ui700__) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'BC';
+  font-family: 'WGText';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url(__FONT:bc700x__) format('woff2');
+  src: url(__FONT:ui700x__) format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
     U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
@@ -101,13 +113,15 @@
   --m8: #8b5e3c;
   --m9: #5f6f85;
   --tabbar-h: 88px;
-  --marker: 'PM', 'Marker Felt', 'Comic Sans MS', cursive;
-  --ui: 'BC', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --hand: 'WGHand', 'Chalkboard SE', 'Comic Sans MS', cursive;
+  --ui: 'WGText', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --doodles: url(__IMG:doodles-light__);
   color-scheme: light;
 }
 
 /* the stage at night: the floor and the desk go dark, paper stays paper */
 :root[data-theme='dark'] {
+  --doodles: url(__IMG:doodles-dark__);
   --floor: #1c1d20;
   --floor-dot: rgba(255, 255, 255, 0.05);
   --floor-ink: #ecedef;
@@ -124,6 +138,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root[data-theme='system'] {
+    --doodles: url(__IMG:doodles-dark__);
     --floor: #1c1d20;
     --floor-dot: rgba(255, 255, 255, 0.05);
     --floor-ink: #ecedef;
@@ -157,13 +172,14 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   background-color: var(--floor);
-  background-image: radial-gradient(var(--floor-dot) 1px, transparent 1.4px);
-  background-size: 9px 9px;
+  background-image: var(--doodles), radial-gradient(var(--floor-dot) 1px, transparent 1.4px);
+  background-size: 820px 820px, 9px 9px;
+  background-position: -60px 40px, 0 0;
   color: var(--ink);
   font-family: var(--ui);
-  font-weight: 500;
-  font-size: 18px;
-  line-height: 1.4;
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
@@ -280,12 +296,20 @@ p {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.sync-wrap {
+  display: flex;
+}
 .sync {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 15px;
+  margin: 0 0 0 -2px;
+  padding: 2px 2px;
+  border: 0;
+  background: none;
+  font-size: 14.5px;
   color: var(--floor-ink-2);
+  text-align: left;
 }
 .sync::before {
   content: '';
@@ -305,6 +329,12 @@ p {
 .sync.is-warn::before {
   background: var(--warn);
   box-shadow: 0 0 6px color-mix(in srgb, var(--warn) 70%, transparent);
+}
+.sync.is-busy::before {
+  animation: blink 0.9s ease-in-out infinite alternate;
+}
+@keyframes blink {
+  to { opacity: 0.25; }
 }
 .sync.is-bad {
   color: var(--red);
@@ -332,7 +362,6 @@ p {
   margin: 6px auto 0;
   margin-inline: max(12px, calc((100% - 556px) / 2));
   padding: 38px 20px 30px;
-  min-height: calc(100dvh - 62px - env(safe-area-inset-top) - var(--tabbar-h) - env(safe-area-inset-bottom) - 34px);
   background: var(--paper);
   box-shadow: var(--shadow);
   animation: sheet-drop 0.55s cubic-bezier(0.2, 0.85, 0.25, 1) backwards;
@@ -366,18 +395,18 @@ p {
   margin: 0 0 22px;
 }
 .headline h1 {
-  font-family: var(--marker);
-  font-weight: 400;
-  font-size: clamp(32px, 9vw, 40px);
-  line-height: 1.08;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: clamp(29px, 8.2vw, 37px);
+  line-height: 1.14;
   color: var(--ink);
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
 .headline__sub {
-  margin-top: 8px;
+  margin-top: 10px;
   color: var(--ink-2);
-  font-size: 19px;
+  font-size: 17.5px;
   line-height: 1.35;
   max-width: 34em;
   text-wrap: pretty;
@@ -388,15 +417,16 @@ p {
 }
 .section__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 2px 12px;
   margin-bottom: 4px;
 }
 .section__head h2 {
-  font-family: var(--marker);
-  font-weight: 400;
-  font-size: 22px;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 21px;
   line-height: 1.2;
   color: var(--ink);
 }
@@ -427,8 +457,9 @@ p {
   padding: 22px 0;
 }
 .empty__title {
-  font-family: var(--marker);
-  font-size: 22px;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 21px;
 }
 .empty__text {
   color: var(--ink-2);
@@ -504,8 +535,10 @@ p {
   background: var(--masking);
   box-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.2);
   clip-path: polygon(0 6%, 4% 0, 96% 4%, 100% 0, 98% 50%, 100% 96%, 3% 100%, 1% 52%);
-  font-family: var(--marker);
-  font-size: 16px;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.01em;
   line-height: 1.2;
   color: #17171b;
   white-space: nowrap;
@@ -517,7 +550,8 @@ p {
   .tab__tape {
     gap: 3px;
     padding: 4px 5px 3px;
-    font-size: 13.5px;
+    font-size: 13px;
+    letter-spacing: -0.02em;
   }
   .badge {
     min-width: 18px;
@@ -673,20 +707,23 @@ p {
 .icon-btn:disabled {
   opacity: 0.3;
 }
-/* the record button of a tape deck */
+/* the record button of a tape deck, with its label */
 .fab {
   position: fixed;
   z-index: 25;
   right: max(16px, calc(50% - 290px + 16px));
   bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px);
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
+  height: 58px;
+  padding: 0 22px 0 16px;
+  border-radius: 999px;
   border: 4px solid #f2f2f0;
-  background: radial-gradient(circle at 35% 30%, #ee4a3c, var(--red) 60%, #a71c13);
+  background: radial-gradient(circle at 30% 25%, #ee4a3c, var(--red) 60%, #a71c13);
   color: #fff;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 18px;
   box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.25), 0 6px 16px rgba(20, 20, 20, 0.3);
 }
 
@@ -703,9 +740,9 @@ p {
   place-items: center;
   background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 45%), var(--mc);
   color: #fff;
-  font-family: var(--marker);
-  font-weight: 400;
-  font-size: calc(var(--s) * 0.48);
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: calc(var(--s) * 0.46);
   line-height: 1;
   transform: rotate(-6deg);
   box-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.25);
@@ -761,8 +798,9 @@ p {
   border-bottom: 2.5px solid var(--ink);
   border-radius: 0;
   background: transparent;
-  font-family: var(--marker);
-  font-size: 24px;
+  font-family: var(--ui);
+  font-weight: 600;
+  font-size: 21px;
   color: var(--ink);
 }
 .adder input::placeholder {
@@ -783,8 +821,9 @@ p {
   padding: 0;
   display: grid;
   place-items: center;
-  font-family: var(--marker);
-  font-size: 16px;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 15px;
   color: var(--ink);
 }
 .kasse-toggle::before {
@@ -845,7 +884,8 @@ p {
   padding: 0 14px 0 10px;
   border: 0;
   background: none;
-  font-family: var(--marker);
+  font-family: var(--ui);
+  font-weight: 600;
   font-size: 16px;
   color: #17171b;
 }
@@ -912,9 +952,10 @@ p {
 }
 .item__word {
   position: relative;
-  font-family: var(--marker);
-  font-size: 25px;
-  line-height: 1.18;
+  font-family: var(--ui);
+  font-weight: 600;
+  font-size: 21px;
+  line-height: 1.25;
   color: var(--ink);
   overflow-wrap: anywhere;
   transition: color 0.3s ease;
@@ -940,8 +981,9 @@ p {
 .tag {
   display: inline-block;
   padding: 1px 8px 0;
-  font-family: var(--marker);
-  font-size: 14px;
+  font-family: var(--ui);
+  font-weight: 700;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--ink);
   background: var(--masking);
@@ -961,7 +1003,7 @@ p {
   border-radius: 58% 42% 55% 45% / 52% 48% 56% 44%;
   transform: rotate(-4deg);
   color: var(--red);
-  font-size: 15px;
+  font-size: 14px;
 }
 .checkout-bar {
   position: sticky;
@@ -980,26 +1022,60 @@ p {
   padding: 10px 0;
   list-style-position: inside;
 }
-.hist {
+/* history, week by week: a header line like on a setlist, entries below */
+.week {
+  margin-top: 18px;
+}
+.week__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+}
+.week__dates {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.buy {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 52px;
+  gap: 12px;
+  min-height: 58px;
+  padding: 7px 0;
   border-bottom: 1px dashed var(--rule);
 }
-.hist__text {
+.buy__main {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
-.hist__text > span:first-child {
-  font-family: var(--marker);
-  font-size: 19px;
+.buy__what {
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
-.hist__meta {
+.buy__meta {
   font-size: 15px;
   color: var(--ink-2);
+}
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  min-height: 40px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--red);
+  font-weight: 700;
+  font-size: 16px;
 }
 
 /* ------------------------------------------------------------ sheets & forms */
@@ -1051,9 +1127,9 @@ p {
   padding: 22px 8px 2px 20px;
 }
 .sheet__head h2 {
-  font-family: var(--marker);
-  font-weight: 400;
-  font-size: 25px;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 23px;
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
@@ -1207,8 +1283,8 @@ p {
   border-radius: 14px 4px 12px 5px / 5px 12px 4px 14px;
   background: var(--paper);
   font-family: var(--ui);
-  font-weight: 500;
-  font-size: 19px;
+  font-weight: 400;
+  font-size: 18px;
 }
 .input:focus,
 .money:focus-within {
@@ -1255,8 +1331,9 @@ input[type='date'].input {
   padding: 0 14px;
   border: 0;
   background: none;
-  font-family: var(--marker);
-  font-size: 28px;
+  font-family: var(--ui);
+  font-weight: 700;
+  font-size: 25px;
   font-variant-numeric: tabular-nums;
   outline: none;
 }
@@ -1266,8 +1343,9 @@ input[type='date'].input {
 .money__eur {
   padding-right: 16px;
   color: var(--ink-2);
-  font-family: var(--marker);
-  font-size: 24px;
+  font-family: var(--ui);
+  font-weight: 600;
+  font-size: 22px;
 }
 .inline-form {
   display: flex;
@@ -1378,9 +1456,9 @@ input[type='date'].input {
   border-bottom: 0;
 }
 .group__title {
-  font-family: var(--marker);
-  font-weight: 400;
-  font-size: 21px;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 19px;
   margin-top: 10px;
 }
 .group__items {
@@ -1405,10 +1483,77 @@ input[type='date'].input {
 }
 .row__amount {
   display: block;
-  font-family: var(--marker);
-  font-weight: 400;
-  font-size: 21px;
+  font-weight: 700;
+  font-size: 19px;
 }
+/* who owes whom: the row opens the explanation, the button records the payment */
+.debt {
+  gap: 8px;
+}
+.debt__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.debt__main .row__main {
+  display: flex;
+  flex-direction: column;
+}
+.debt__why {
+  font-size: 15px;
+  color: var(--ink-2);
+  line-height: 1.3;
+}
+.reasons {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+.reason {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px dashed var(--rule);
+  background: none;
+  text-align: left;
+}
+.reason__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.reason__title {
+  font-weight: 700;
+}
+.reason__sub {
+  font-size: 15px;
+  color: var(--ink-2);
+  line-height: 1.3;
+}
+.reason__amt {
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.reasons__total {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0 0;
+  font-weight: 700;
+  font-size: 18px;
+}
+
 /* your own rows get the highlighter */
 .row.is-mine,
 .chore.is-mine {
@@ -1428,8 +1573,9 @@ input[type='date'].input {
   min-width: 0;
 }
 .kasse__amount {
-  font-family: var(--marker);
-  font-size: 32px;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 30px;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
@@ -1527,9 +1673,8 @@ input[type='date'].input {
   font-variant-numeric: tabular-nums;
 }
 .day {
-  font-family: var(--marker);
-  font-weight: 400;
-  font-size: 18px;
+  font-weight: 700;
+  font-size: 16px;
   color: var(--ink-2);
   margin: 22px 0 0;
 }
@@ -1562,10 +1707,13 @@ input[type='date'].input {
 }
 .tx__title {
   font-weight: 700;
-  font-size: 19px;
-  white-space: nowrap;
+  font-size: 18px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .tx__sub {
   font-size: 16px;
@@ -1625,8 +1773,9 @@ input[type='date'].input {
   font-size: 17px;
 }
 .receipt__total {
-  font-family: var(--marker);
-  font-size: 42px;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 38px;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
   margin: 4px 0 6px;
@@ -1693,10 +1842,9 @@ input[type='date'].input {
 }
 .chore__name {
   position: relative;
-  font-family: var(--marker);
-  font-weight: 400;
-  font-size: 22px;
-  line-height: 1.2;
+  font-weight: 600;
+  font-size: 20px;
+  line-height: 1.25;
 }
 .chore__who {
   font-size: 16px;
@@ -1737,11 +1885,28 @@ input[type='date'].input {
   font-weight: 700;
   color: var(--ink-2);
   white-space: nowrap;
+  vertical-align: bottom;
+}
+.plan__wk,
+.plan__date {
+  display: block;
+}
+/* three weeks fit a phone, the fourth only where there is room */
+@media (max-width: 419px) {
+  .plan__far {
+    display: none;
+  }
+}
+.plan__date {
+  font-size: 12.5px;
+  font-weight: 400;
 }
 .plan tbody th {
+  min-width: 6.4em;
   text-align: left;
   font-weight: 700;
-  padding-right: 10px;
+  line-height: 1.25;
+  padding-right: 8px;
 }
 .plan .is-now {
   background: var(--highlight);
@@ -1759,6 +1924,51 @@ input[type='date'].input {
   display: grid;
   place-items: center;
   color: var(--red);
+}
+.hrow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 1px dashed var(--rule);
+  background: none;
+  text-align: left;
+}
+.hrow__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hrow__name {
+  font-weight: 600;
+}
+.hrow__who {
+  font-size: 15px;
+  color: var(--ink-2);
+  line-height: 1.3;
+}
+.hrow.is-missed .hrow__name {
+  color: var(--ink-2);
+}
+.hrow.is-missed .magnet {
+  opacity: 0.5;
+}
+.hrow__mark {
+  width: 26px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--red);
+}
+.hrow__mark svg {
+  overflow: visible;
+}
+.hrow__mark--miss {
+  color: var(--ink-3);
 }
 .stats {
   list-style: none;
@@ -1790,8 +2000,9 @@ input[type='date'].input {
 }
 .stats__n {
   text-align: right;
-  font-family: var(--marker);
-  font-size: 20px;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 19px;
 }
 .emoji-row {
   display: flex;
@@ -1827,6 +2038,11 @@ input[type='date'].input {
 .app--pinnwand .headline h1 {
   color: var(--floor-ink);
 }
+/* text straight on the wall gets a halo so the doodles never cut through it */
+.app--pinnwand .headline,
+.app--pinnwand .section__head h2 {
+  text-shadow: 0 0 4px var(--floor), 0 0 10px var(--floor), 0 0 16px var(--floor);
+}
 .app--pinnwand .headline__sub,
 .app--pinnwand .section__head h2 {
   color: var(--floor-ink-2);
@@ -1849,9 +2065,9 @@ input[type='date'].input {
   background: none;
   resize: none;
   outline: none;
-  font-family: var(--marker);
-  font-size: 20px;
-  line-height: 1.4;
+  font-family: var(--ui);
+  font-size: 18px;
+  line-height: 1.45;
   padding: 4px 2px;
 }
 .composer textarea::placeholder {
@@ -1916,9 +2132,8 @@ input[type='date'].input {
   margin: 10px 0 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-family: var(--marker);
-  font-size: 20px;
-  line-height: 1.42;
+  font-size: 18px;
+  line-height: 1.5;
   max-width: 34em;
 }
 .post__foot {
@@ -1969,9 +2184,9 @@ input[type='date'].input {
   flex-direction: column;
 }
 .me-row__text strong {
-  font-family: var(--marker);
-  font-weight: 400;
-  font-size: 22px;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 21px;
 }
 .me-row__text .muted {
   font-size: 16px;
@@ -2038,8 +2253,9 @@ input[type='date'].input {
   border: 0;
   border-bottom: 1px dashed var(--rule);
   background: none;
-  font-family: var(--marker);
-  font-size: 25px;
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 23px;
   text-align: left;
 }
 .who-btn:active {

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createLocalStore } from '../src/store/local.js';
 import { createApi } from '../src/api.js';
-import { KASSE, computeSummary, summariesEqual, weekIndex, choreAssignee, settlePlan } from '../src/model.js';
+import { KASSE, computeSummary, summariesEqual, summaryOf, weekIndex, choreAssignee, debtList, owes, SUMMARY_VERSION } from '../src/model.js';
 
 function memStorage() {
   const m = new Map();
@@ -18,7 +18,7 @@ const all = (store, coll, opts) => store.getCollection(coll, opts);
 async function summary(store) {
   return (await all(store, 'meta')).find((d) => d.id === 'summary');
 }
-const norm = (s) => ({ balances: s.balances || {}, kasse: s.kasse || 0, contrib: s.contrib || {} });
+const norm = summaryOf;
 const nz = (o) => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => v !== 0));
 
 test('setup creates members and staggered chores', async () => {
@@ -72,6 +72,8 @@ test('shopping trip with Kasse and shared items updates the books atomically', a
   const s = await summary(store);
   assert.equal(s.kasse, -399);
   assert.deepEqual(s.balances, { [me]: 800, [ids[1]]: -400, [ids[2]]: -400 });
+  assert.equal(owes(s.pairs, ids[1], me), 400, 'each flatmate owes the shopper their share');
+  assert.equal(owes(s.pairs, ids[2], me), 400);
   assert.ok(summariesEqual(norm(s), computeSummary(txs)));
   const bought = await all(store, 'items', { orderBy: ['boughtAt', 'desc'], limit: 10 });
   assert.equal(bought.length, 3);
@@ -103,15 +105,19 @@ test('edit, delete and repair keep the running summary exact', async () => {
   assert.ok(summariesEqual(norm(s), computeSummary(txs)));
   assert.deepEqual(nz(s.balances), { [a]: -1200, [b]: 1200 });
 
-  // settle up via the suggested transfers
-  for (const p of settlePlan(nz(s.balances))) await api.addTx({ type: 'transfer', ...p, title: 'Ausgleich' }, a);
+  // settle up person to person
+  const open = debtList(s.pairs);
+  assert.deepEqual(open, [{ from: a, to: b, amount: 1200 }]);
+  for (const d of open) await api.addTx({ type: 'transfer', from: d.from, to: d.to, amount: d.amount, title: 'Rückzahlung' }, a);
   s = await summary(store);
   assert.deepEqual(nz(s.balances), {});
+  assert.deepEqual(debtList(s.pairs), []);
 
   // corrupt the summary, then repair it from the transactions
   await store.commit([{ type: 'set', path: 'meta/summary', data: { balances: { [a]: 999 }, kasse: 1 }, merge: true }]);
   const repaired = await api.recomputeSummary();
   s = await summary(store);
+  assert.equal(s.v, SUMMARY_VERSION);
   assert.ok(summariesEqual(norm(s), repaired));
   assert.ok(summariesEqual(norm(s), computeSummary(await all(store, 'tx'))));
   // sortKey orders by date, then by creation time

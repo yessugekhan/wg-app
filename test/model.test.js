@@ -4,7 +4,8 @@ import {
   KASSE, parseMoney, formatMoney, splitEvenly, txEffect, computeSummary, effectDiff, settlePlan,
   summariesEqual, addEffects, negateEffect, weekIndex, weekMonday, isoWeekNumber, choreAssignee,
   choreDue, rebaseRotation, startRotationWith, nextDueWeek, guessKasse, suggest, shoppingTitle,
-  relTime, dayKey, shiftMonth, monthLabel,
+  relTime, dayKey, shiftMonth, monthLabel, owes, debtList, debtReasons, summaryOf, semesterWeek, weekInfo, relWeek,
+  parseDayKey,
 } from '../src/model.js';
 
 const NBSP = ' ';
@@ -212,4 +213,99 @@ test('relTime and month helpers in German', () => {
   assert.equal(shiftMonth('2026-01', -1), '2025-12');
   assert.equal(shiftMonth('2026-12', 1), '2027-01');
   assert.equal(monthLabel('2026-10'), 'Oktober 2026');
+});
+
+test('who owes whom: Simon buys oven gloves for the whole WG', () => {
+  const wg = ['simon', 'yessu', 'felix', 'tauno', 'ernest'];
+  const gloves = { type: 'expense', title: 'Ofenhandschuhe', amount: 1750, paidBy: 'simon', split: wg };
+  const e = txEffect(gloves);
+  for (const id of wg.slice(1)) assert.equal(owes(e.pairs, id, 'simon'), 350, id);
+  assert.equal(owes(e.pairs, 'simon', 'yessu'), -350, 'seen from Simon it is negative');
+  assert.equal(e.balances.simon, 1400);
+  assert.deepEqual(debtList(e.pairs).map((d) => [d.from, d.to, d.amount]).sort(), wg.slice(1).map((id) => [id, 'simon', 350]).sort());
+  // Yessu pays Simon back: only that pair is settled
+  const after = computeSummary([gloves, { type: 'transfer', from: 'yessu', to: 'simon', amount: 350 }]);
+  assert.equal(owes(after.pairs, 'yessu', 'simon'), 0);
+  assert.equal(owes(after.pairs, 'felix', 'simon'), 350);
+  assert.equal(debtList(after.pairs).length, 3);
+});
+
+test('debts between two people net out instead of piling up', () => {
+  const s = computeSummary([
+    { type: 'expense', amount: 1000, paidBy: 'a', split: ['a', 'b'] }, // b owes a 5
+    { type: 'expense', amount: 600, paidBy: 'b', split: ['a', 'b'] }, // a owes b 3
+  ]);
+  assert.deepEqual(debtList(s.pairs), [{ from: 'b', to: 'a', amount: 200 }]);
+});
+
+test('per-person debts always add up to the balances', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e'];
+  let r = 7;
+  const rnd = (n) => ((r = (r * 1103515245 + 12345) % 2147483648) % n);
+  const txs = [];
+  for (let i = 0; i < 300; i++) {
+    const k = rnd(10);
+    if (k < 6) {
+      const split = ids.filter(() => rnd(3) > 0);
+      txs.push({ type: 'expense', amount: 1 + rnd(9000), paidBy: rnd(6) === 0 ? KASSE : ids[rnd(5)], split });
+    } else if (k < 8) {
+      txs.push({ type: 'transfer', amount: 1 + rnd(3000), from: ids[rnd(5)], to: ids[rnd(5)] });
+    } else {
+      txs.push({ type: 'deposit', amount: 1000, member: ids[rnd(5)], month: '2026-10' });
+    }
+  }
+  const s = computeSummary(txs);
+  for (const id of ids) {
+    const fromPairs = ids.reduce((sum, other) => sum - owes(s.pairs, id, other), 0);
+    assert.equal(fromPairs, s.balances[id] || 0, id);
+  }
+  assert.ok(summariesEqual(summaryOf(s), computeSummary([...txs].reverse())));
+});
+
+test('debtReasons explains the open part of a debt, newest first', () => {
+  const tx = (id, data) => ({ id, ...data });
+  const newestFirst = [
+    tx('t5', { type: 'expense', title: 'Ofenhandschuhe', amount: 700, paidBy: 's', split: ['s', 'y'] }),
+    tx('t4', { type: 'expense', title: 'Pizza', amount: 1000, paidBy: 's', split: ['s', 'y'] }),
+    tx('t3', { type: 'transfer', amount: 200, from: 'y', to: 's' }),
+    tx('t2', { type: 'expense', title: 'Kino', amount: 400, paidBy: 's', split: ['s', 'y'] }), // was settled by t3
+    tx('t1', { type: 'expense', title: 'Brot', amount: 300, paidBy: 'y', split: ['f'] }), // not between y and s
+  ];
+  const current = owes(computeSummary(newestFirst).pairs, 'y', 's');
+  assert.equal(current, 850);
+  const { items, complete } = debtReasons(newestFirst, 'y', 's', current);
+  assert.equal(complete, true);
+  assert.deepEqual(items.map((i) => [i.tx.id, i.delta]), [['t5', 350], ['t4', 500]]);
+  // only part of the history loaded: says so
+  const partial = debtReasons(newestFirst.slice(0, 1), 'y', 's', current);
+  assert.equal(partial.complete, false);
+  assert.deepEqual(debtReasons(newestFirst, 'y', 's', 0), { items: [], complete: true });
+});
+
+test('weeks are named like at TU Darmstadt: Vorlesungswoche, Weihnachtspause, Semesterferien', () => {
+  const w = (k) => weekIndex(parseDayKey(k));
+  assert.deepEqual(semesterWeek(w('2026-10-12')), { kind: 'lecture', n: 1, semester: 'Wintersemester 2026/27' });
+  assert.equal(semesterWeek(w('2026-10-18')).n, 1, 'Sunday still belongs to the week');
+  assert.equal(semesterWeek(w('2026-12-14')).n, 10);
+  assert.equal(semesterWeek(w('2026-12-21')).kind, 'break');
+  assert.equal(semesterWeek(w('2027-01-08')).kind, 'break');
+  assert.equal(semesterWeek(w('2027-01-11')).n, 11, 'counting goes on after the break');
+  assert.equal(semesterWeek(w('2027-02-12')).n, 15);
+  assert.equal(semesterWeek(w('2027-02-15')).kind, 'free');
+  assert.equal(semesterWeek(w('2026-10-05')).kind, 'free');
+  assert.equal(semesterWeek(w('2027-04-12')).n, 1, 'summer semester starts at 1 again');
+  assert.equal(semesterWeek(w('2028-04-18')).n, 1, 'a Tuesday start still makes that week the first');
+
+  const now = weekInfo(w('2026-10-14'));
+  assert.equal(now.title, '1. Vorlesungswoche');
+  assert.equal(now.short, 'Woche 1');
+  assert.equal(now.range, '12. bis 18. Oktober');
+  assert.equal(now.dates, '12.10.–18.10.');
+  assert.equal(now.from, '12. Okt.');
+  const xmas = weekInfo(w('2026-12-28'));
+  assert.equal(xmas.title, 'Weihnachtspause');
+  assert.equal(xmas.range, '28. Dezember bis 3. Januar');
+  assert.equal(weekInfo(w('2026-09-30')).title, 'Semesterferien');
+  assert.equal(relWeek(w('2026-10-05'), w('2026-10-12')), 'letzte Woche');
+  assert.equal(relWeek(w('2026-10-26'), w('2026-10-12')), '3. Vorlesungswoche');
 });

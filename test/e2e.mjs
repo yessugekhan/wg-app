@@ -6,13 +6,13 @@ import http from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { join, dirname, extname } from 'node:path';
 import assert from 'node:assert/strict';
-import { computeSummary, summariesEqual, formatMoney, settlePlan } from '../src/model.js';
+import { computeSummary, summariesEqual, summaryOf, formatMoney, debtList } from '../src/model.js';
 
 const root = join(dirname(new URL(import.meta.url).pathname), '..');
 const shots = process.argv[2] || join(root, 'shots');
 await mkdir(shots, { recursive: true });
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
 // The built site carries the real Firebase config; the walkthrough runs it in demo mode,
 // except under /live/, which serves the real config to check the join and connect screens.
 const DEMO_CONFIG = 'window.WG_CONFIG = { firebase: null };';
@@ -66,7 +66,7 @@ async function byText(page, selector, text, { exact = false, timeout = 4000 } = 
         const t = e.textContent.replace(/\s+/g, ' ').trim();
         return (exact ? t === text : t.includes(text)) && e.offsetParent !== null;
       }),
-    { timeout },
+    { timeout, polling: 100 },
     selector,
     text,
     exact,
@@ -81,9 +81,10 @@ async function tap(el) {
 }
 const click = async (page, selector, text, opts) => tap(await byText(page, selector, text, opts));
 const headline = (page) => textOf(page, '.headline h1');
-async function waitHeadline(page, expected) {
-  await page.waitForFunction((t) => document.querySelector('.headline h1')?.textContent.includes(t), { timeout: 4000 }, expected).catch(async () => {
-    throw new Error(`headline: expected "${expected}", got "${await headline(page)}"`);
+async function waitHeadline(page, expected, timeout = 8000) {
+  // interval polling: requestAnimationFrame is throttled in pages that are not in front
+  await page.waitForFunction((t) => document.querySelector('.headline h1')?.textContent.includes(t), { timeout, polling: 100 }, expected).catch(async () => {
+    throw new Error(`headline: expected "${expected}", got "${await headline(page).catch(() => '-')}"`);
   });
 }
 async function shot(page, name) {
@@ -95,6 +96,19 @@ async function noOverflow(page, label) {
   assert.ok(o <= 0, `${label}: horizontal overflow ${o}px`);
 }
 const state = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('wgapp:demo') || '{}'));
+// the Geld headline, worked out from the per-person debts the same way the app words it
+function moneyHead(me, pairs, nameOf) {
+  const list = debtList(pairs);
+  const owe = list.filter((d) => d.from === me);
+  const get = list.filter((d) => d.to === me);
+  const sum = (l) => l.reduce((a, d) => a + d.amount, 0);
+  if (owe.length === 1) return `Du schuldest ${nameOf(owe[0].to)} ${formatMoney(owe[0].amount)}.`;
+  if (owe.length === 2) return `Du schuldest ${nameOf(owe[0].to)} ${formatMoney(owe[0].amount)} und ${nameOf(owe[1].to)} ${formatMoney(owe[1].amount)}.`;
+  if (owe.length > 2) return `Du schuldest ${owe.length} Leuten zusammen ${formatMoney(sum(owe))}.`;
+  if (get.length === 1) return `${nameOf(get[0].from)} schuldet dir ${formatMoney(get[0].amount)}.`;
+  if (get.length > 1) return `Du bekommst ${formatMoney(sum(get))} von ${get.length} Leuten.`;
+  return 'Du bist mit allen quitt.';
+}
 async function typeInto(page, selector, text) {
   const el = await page.waitForSelector(selector, { visible: true });
   await el.evaluate((e) => (e.focus(), e.select()));
@@ -152,44 +166,67 @@ try {
   await click(page, '.sheet__foot button', 'Abschließen');
   await byText(page, '.toast', 'Einkauf abgeschlossen, 9,79');
   await waitHeadline(page, '4 Sachen fehlen.');
-  log('checkout created two bookings (Kasse 2,49 and shared 7,30)');
+  // the purchase history shows the trip: who, when, what, how much
+  const trip = await byText(page, '.buy', 'Käse');
+  const tripText = await trip.evaluate((e) => e.textContent);
+  for (const part of ['Brot', 'Spülmittel', 'Du, heute', `2,49${NBSP}€ aus der Kasse`, `7,30${NBSP}€`]) assert.ok(tripText.includes(part), `${part} in "${tripText}"`);
+  assert.ok((await textOf(page, '.week__head')).startsWith('Diese Woche'), 'history starts with this week');
+  // something bought without the list: straight into the expense form on the Geld tab
+  await click(page, '.link-btn', 'Einkauf eintragen');
+  await byText(page, '.sheet h2', 'Neue Buchung');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.sheet'), { timeout: 4000 });
+  log('checkout created two bookings (Kasse 2,49 and shared 7,30), history lists the trip, "Einkauf eintragen" opens the form');
 
   let s = await state(page);
   const txList = () => Object.values(s.tx || {});
-  assert.ok(summariesEqual({ balances: s.meta.summary.balances, kasse: s.meta.summary.kasse, contrib: s.meta.summary.contrib }, computeSummary(txList())), 'running summary equals recomputed one');
+  assert.ok(summariesEqual(summaryOf(s.meta.summary), computeSummary(txList())), 'running summary equals recomputed one');
   const ids = Object.fromEntries(Object.entries(s.members).map(([id, m]) => [m.name, id]));
   const kasseBefore = 1250 - 685 + 3000;
   assert.equal(s.meta.summary.kasse, kasseBefore - 249, 'Kasse after checkout');
 
   // ------------------------------------------------------------------ money
   await click(page, '.tab', 'Geld');
-  const anna = s.meta.summary.balances[ids.Anna];
-  await waitHeadline(page, anna > 0 ? `Du bekommst ${formatMoney(anna)}` : `Du schuldest ${formatMoney(-anna)}`);
+  const nameOf = (id) => s.members[id].name;
+  const debts = debtList(s.meta.summary.pairs);
+  await waitHeadline(page, moneyHead(ids.Anna, s.meta.summary.pairs, nameOf));
   const kasseShown = await textOf(page, '.kasse__amount');
   assert.equal(kasseShown, formatMoney(kasseBefore - 249));
   const contribLine = await textOf(page, '.contrib__line');
   assert.ok(contribLine.includes('3 von 4'), contribLine);
-  log(`Geld headline matches Anna's balance (${formatMoney(anna)}), Kasse ${kasseShown}, 3 von 4 Beiträge`);
+  assert.equal(await page.$$eval('.debt', (r) => r.length), debts.length, 'one row per open debt');
+  // Clara's oven gloves (demo): Anna's share shows up as the reason in the Clara row
+  const claraRow = await byText(page, '.debt', 'Clara');
+  log(`Geld headline "${await headline(page)}", ${debts.length} open debts, Kasse ${kasseShown}, 3 von 4 Beiträge`);
   await shot(page, '06-geld');
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await shot(page, '07-geld-verlauf');
   await page.evaluate(() => window.scrollTo(0, 0));
   await noOverflow(page, 'geld');
 
-  // settle every suggested transfer from the plan; balances must reach zero
-  const plan = settlePlan(Object.fromEntries(Object.entries(s.meta.summary.balances).filter(([, v]) => v)));
-  assert.equal(await page.$$eval('.row .btn', (b) => b.length), plan.length, 'UI shows the computed plan');
-  for (let i = 0; i < 10 && (await page.$('.row .btn')); i++) {
-    const n = await page.$$eval('.row .btn', (b) => b.length);
-    await click(page, '.row .btn', 'Bezahlt');
+  // a debt explains itself: the bookings behind it add up to the open amount
+  await tap(await claraRow.$('.debt__main'));
+  await byText(page, '.sheet h2', 'Clara');
+  const reasons = await page.$$eval('.sheet .reason__title', (e) => e.map((x) => x.textContent));
+  assert.ok(reasons.includes('Ofenhandschuhe'), reasons.join(' | '));
+  const claraDebt = debts.find((d) => (d.from === ids.Clara && d.to === ids.Anna) || (d.from === ids.Anna && d.to === ids.Clara));
+  assert.equal(await textOf(page, '.sheet .reasons__total .amount'), formatMoney(claraDebt.amount));
+  await shot(page, '07b-schuld');
+  await page.keyboard.press('Escape');
+
+  // settle every debt person to person; everything must reach zero
+  for (let i = 0; i < 12 && (await page.$('.debt .btn')); i++) {
+    const n = await page.$$eval('.debt .btn', (b) => b.length);
+    await tap(await page.$('.debt .btn'));
     await byText(page, '.sheet h2', 'Rückzahlung eintragen');
     await click(page, '.sheet__foot button', 'Eintragen');
-    await page.waitForFunction((n) => document.querySelectorAll('.row .btn').length < n, { timeout: 4000 }, n);
+    await page.waitForFunction((n) => document.querySelectorAll('.debt .btn').length < n, { timeout: 4000 }, n);
   }
-  await waitHeadline(page, 'Du bist ausgeglichen.');
+  await waitHeadline(page, 'Du bist mit allen quitt.');
   s = await state(page);
   assert.ok(Object.values(s.meta.summary.balances).every((v) => v === 0), 'all balances zero after settling');
-  log(`settled ${plan.length} transfers, everyone at 0`);
+  assert.deepEqual(debtList(s.meta.summary.pairs), [], 'nobody owes anybody');
+  log(`settled ${debts.length} debts person to person, everyone at 0`);
 
   // manual expense with the FAB, split between two people
   await (await page.$('.fab')).click();
@@ -201,11 +238,12 @@ try {
   for (const n of ['Clara', 'Deniz']) await click(page, '.sheet .field[aria-label="Für wen?"] .person', n);
   const hint = await textOf(page, '.sheet .field__hint');
   assert.equal(hint, `10,00${NBSP}€ pro Person`);
+  const owesHint = await page.$$eval('.sheet .field__hint', (e) => e.map((x) => x.textContent));
+  assert.ok(owesHint.includes(`Danach bekommst du von Ben 10,00${NBSP}€.`), owesHint.join(' | '));
   await click(page, '.sheet__foot button', 'Speichern');
-  await waitHeadline(page, `Du bekommst 10,00${NBSP}€.`);
-  const subGeld = await textOf(page, '.headline__sub');
-  assert.ok(subGeld.includes(`Ben zahlt dir 10,00${NBSP}€.`), subGeld);
-  log('manual expense: Anna gets 10,00 € from Ben');
+  await waitHeadline(page, `Ben schuldet dir 10,00${NBSP}€.`);
+  assert.equal(await textOf(page, '.debt__why'), 'für Pizza');
+  log('manual expense: Ben owes Anna 10,00 € for Pizza');
 
   // deposit for the current month by Deniz -> 4 von 4
   await (await page.$('.fab')).click();
@@ -232,22 +270,44 @@ try {
   await amt.type('30');
   assert.equal(await amt.evaluate((e) => e.value), '30');
   await click(page, '.sheet__foot button', 'Speichern');
-  await waitHeadline(page, `Du bekommst 15,00${NBSP}€.`);
+  await waitHeadline(page, `Ben schuldet dir 15,00${NBSP}€.`);
   await openTx('Pizza');
   await click(page, '.sheet__foot button', 'Löschen');
   await click(page, '.sheet__foot button', 'Löschen');
-  await waitHeadline(page, 'Du bist ausgeglichen.');
+  await waitHeadline(page, 'Du bist mit allen quitt.');
   s = await state(page);
-  assert.ok(summariesEqual({ balances: s.meta.summary.balances, kasse: s.meta.summary.kasse, contrib: s.meta.summary.contrib }, computeSummary(Object.values(s.tx))));
+  assert.ok(summariesEqual(summaryOf(s.meta.summary), computeSummary(Object.values(s.tx))));
   log('edit and delete keep the books exact');
+
+  // "everybody owes me 3,50": typed per person
+  await (await page.$('.fab')).click();
+  await byText(page, '.sheet h2', 'Neue Buchung');
+  await new Promise((r) => setTimeout(r, 300));
+  await typeInto(page, '.sheet input.input[type=text]', 'Ofenhandschuhe');
+  await click(page, '.sheet .seg__opt', 'Pro Person');
+  await (await page.$('.sheet .money input')).type('3,50');
+  const hints = await page.$$eval('.sheet .field__hint', (e) => e.map((x) => x.textContent));
+  assert.ok(hints.includes(`Zusammen 14,00${NBSP}€ für 4 Leute`), hints.join(' | '));
+  assert.ok(hints.includes(`Danach bekommst du von allen anderen je 3,50${NBSP}€.`), hints.join(' | '));
+  await shot(page, '08b-pro-person');
+  await click(page, '.sheet__foot button', 'Speichern');
+  await waitHeadline(page, `Du bekommst 10,50${NBSP}€ von 3 Leuten.`);
+  s = await state(page);
+  const gloves = Object.values(s.tx).find((t) => t.title === 'Ofenhandschuhe' && t.paidBy === ids.Anna);
+  assert.equal(gloves.amount, 1400);
+  assert.ok(summariesEqual(summaryOf(s.meta.summary), computeSummary(Object.values(s.tx))));
+  log('per-person expense: 3,50 each, Anna gets 10,50 € from 3 people');
 
   // ------------------------------------------------------------------ chores
   await click(page, '.tab', 'Putzen');
   const h = await headline(page);
   assert.ok(/^(Deine Aufgabe|Deine Aufgaben|Diese Woche hast du frei|Du hast diese Woche alles erledigt)/.test(h), h);
   const sub2 = await textOf(page, '.headline__sub');
-  assert.ok(/^Kalenderwoche \d+, \d+\. (\p{L}+ )?bis \d+\. \p{L}+\./u.test(sub2), sub2);
+  assert.ok(/^(\d+\. Vorlesungswoche|Weihnachtspause|Semesterferien), \d+\. (\p{L}+ )?bis \d+\. \p{L}+\./u.test(sub2), sub2);
   assert.ok(sub2.includes('Müll & Pfand'), 'last week open item mentioned');
+  const weekHeads = await page.$$eval('.week__head', (e) => e.map((x) => x.textContent));
+  assert.ok(weekHeads[0].startsWith('Letzte Woche'), weekHeads.join(' | '));
+  assert.ok((await page.$$('.hrow.is-done')).length > 3 && (await page.$$('.hrow.is-missed')).length >= 1, 'history shows done and missed chores');
   await shot(page, '09-putzen');
   await page.evaluate(() => window.scrollTo(0, 600));
   await shot(page, '10-putzen-plan');
@@ -277,6 +337,9 @@ try {
   await byText(page, '.ack.is-on', 'Gesehen');
   await shot(page, '11-pinnwand');
   log('pinboard: posted, acknowledged');
+  await tap(await page.$('.sync'));
+  await byText(page, '.toast', 'Grau: Das ist die Demo');
+  log('the sync dot explains itself');
 
   // ------------------------------------------------------------------ second tab of the same device sees changes live
   const page2 = await phone(ctx);
@@ -340,7 +403,7 @@ try {
   await shot(small, '15-small-putzen');
   await noOverflow(small, 'small putzen');
   await click(small, '.tab', 'Geld');
-  await waitHeadline(small, 'Du bist ausgeglichen.');
+  await waitHeadline(small, 'Du bist mit allen quitt.');
   await noOverflow(small, 'small geld');
   log('setup on a 320px phone: WG created with 3 people and 4 chores, no overflow');
 

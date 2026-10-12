@@ -3,7 +3,7 @@
 import { signal, computed, effect } from '@preact/signals';
 import { createLocalStore, safeLocalStorage } from './store/local.js';
 import { createApi } from './api.js';
-import { weekIndex, settlePlan } from './model.js';
+import { weekIndex, debtList, SUMMARY_VERSION } from './model.js';
 
 export const TABS = ['liste', 'geld', 'putzen', 'pinnwand', 'wg'];
 
@@ -42,8 +42,13 @@ export const boughtItems = signal([]);
 export const txs = signal([]);
 export const txsReady = signal(false);
 export const txLimit = signal(80);
+export const boughtLimit = signal(60);
 export const chores = signal([]);
 export const choreLog = signal([]);
+/** How many weeks of the chore log are loaded (history grows on demand). */
+export const choreWeeks = signal(10);
+/** Another tab asks Geld to open a form right away, e.g. { mode: 'expense' }. */
+export const pendingForm = signal(null);
 export const posts = signal([]);
 export const pinnedPosts = signal([]);
 export const meId = signal(null);
@@ -90,7 +95,8 @@ export const initials = computed(() => {
 export const balances = computed(() =>
   Object.fromEntries(Object.entries(summary.value?.balances || {}).filter(([, v]) => v)),
 );
-export const transferPlan = computed(() => settlePlan(balances.value));
+/** Who owes whom, straight from the purchases (no netting across people). */
+export const debts = computed(() => debtList(summary.value?.pairs));
 export const currentWeek = computed(() => weekIndex(new Date(clock.value)));
 
 export const screen = computed(() => {
@@ -276,9 +282,15 @@ function connect(store, kind, wgId) {
     track('wg', m);
     if (d || !m.fromCache) wg.value = d;
   }, fail('wg'));
+  // summaries written by an older app version lack the per-person debts: rebuild them once from all bookings
+  let lastUpgrade = 0;
   store.watchDoc('meta/summary', (d, m) => {
     track('summary', m);
     summary.value = d;
+    if (d && !m.fromCache && (d.v || 0) < SUMMARY_VERSION && Date.now() - lastUpgrade > 60000) {
+      lastUpgrade = Date.now();
+      ctx.api.recomputeSummary().catch((e) => console.warn('summary upgrade failed', e));
+    }
   }, fail('summary'));
   watch('members', 'members', {}, (docs, m) => {
     if (docs.length || !m.fromCache) {
@@ -287,21 +299,31 @@ function connect(store, kind, wgId) {
     }
   });
   watch('open', 'items', { where: [['state', 'in', ['open', 'cart']]] }, (docs) => (openItems.value = docs));
-  watch('bought', 'items', { orderBy: ['boughtAt', 'desc'], limit: 40 }, (docs) => (boughtItems.value = docs));
   watch('chores', 'chores', {}, (docs) => (chores.value = docs));
-  watch('choreLog', 'choreLog', { where: [['week', '>=', weekIndex() - 9]] }, (docs) => (choreLog.value = docs));
   watch('posts', 'posts', { orderBy: ['createdAt', 'desc'], limit: 60 }, (docs) => (posts.value = docs));
   watch('pinned', 'posts', { where: [['pinned', '==', true]] }, (docs) => (pinnedPosts.value = docs));
 
-  let stopTx = null;
-  effect(() => {
-    const lim = txLimit.value;
-    stopTx?.();
-    stopTx = watch('tx', 'tx', { orderBy: ['sortKey', 'desc'], limit: lim }, (docs) => {
+  // windows that grow when someone scrolls back in a history: re-subscribe when the limit changes
+  const growing = (make) => {
+    let stop = null;
+    effect(() => {
+      const next = make();
+      stop?.();
+      stop = next;
+    });
+  };
+  growing(() =>
+    watch('tx', 'tx', { orderBy: ['sortKey', 'desc'], limit: txLimit.value }, (docs) => {
       txs.value = docs;
       txsReady.value = true;
-    });
-  });
+    }),
+  );
+  growing(() =>
+    watch('bought', 'items', { orderBy: ['boughtAt', 'desc'], limit: boughtLimit.value }, (docs) => (boughtItems.value = docs)),
+  );
+  growing(() =>
+    watch('choreLog', 'choreLog', { where: [['week', '>=', weekIndex() - (choreWeeks.value - 1)]] }, (docs) => (choreLog.value = docs)),
+  );
 
   connected.value = true;
 }

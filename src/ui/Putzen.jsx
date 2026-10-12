@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'preact/hooks';
-import { ctx, chores, choreLog, activeMembers, meId, currentWeek, name, nameDat, joinNames, run, toast } from '../state.js';
-import { choreDue, choreAssignee, choreLogId, weekInfo, weekIndex, nextDueWeek } from '../model.js';
+import { ctx, chores, choreLog, choreWeeks, activeMembers, meId, currentWeek, clock, name, nameDat, joinNames, run, toast } from '../state.js';
+import { choreDue, choreAssignee, choreLogId, weekInfo, weekIndex, nextDueWeek, relWeek, dayKey, dayLabelInline } from '../model.js';
 import { Headline, Section, Sheet, Magnet, People, Field, Segmented, Confirm, Check, Strike } from './kit.jsx';
 import { ICheck, IUndo, IPencil, IPlus } from './icons.jsx';
 
@@ -51,7 +51,7 @@ export function Putzen() {
   else if (myDue.length) head = 'Du hast diese Woche alles erledigt.';
   else head = 'Diese Woche hast du frei.';
 
-  const sub = [`Kalenderwoche ${info.kw}, ${info.range}.`];
+  const sub = [`${info.title}, ${info.range}.`];
   if (lastWeekOpen.length) sub.push(`Von letzter Woche ist noch offen: ${joinNames(lastWeekOpen.map((c) => c.name))}.`);
 
   const markDone = (c, w) => {
@@ -120,7 +120,7 @@ export function Putzen() {
             {notDue.map((c, i) => (
               <span key={c.id}>
                 {i > 0 && ', '}
-                {c.name} (wieder ab KW {weekInfo(nextDueWeek(c, week)).kw})
+                {c.name} (wieder in der Woche ab {weekInfo(nextDueWeek(c, week)).from})
               </span>
             ))}
             .
@@ -158,11 +158,15 @@ export function Putzen() {
             <thead>
               <tr>
                 <th scope="col">Aufgabe</th>
-                {[0, 1, 2, 3].map((k) => (
-                  <th scope="col" class={k === 0 ? 'is-now' : ''} key={k}>
-                    {k === 0 ? 'Jetzt' : `KW ${weekInfo(week + k).kw}`}
-                  </th>
-                ))}
+                {[0, 1, 2, 3].map((k) => {
+                  const wi = weekInfo(week + k);
+                  return (
+                    <th scope="col" class={k === 0 ? 'is-now' : k === 3 ? 'plan__far' : ''} key={k}>
+                      <span class="plan__wk">{k === 0 ? 'Jetzt' : wi.short}</span>
+                      <span class="plan__date">{wi.dates.split('–')[0]}</span>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -175,7 +179,7 @@ export function Putzen() {
                     const w = week + k;
                     const a = choreDue(c, w) ? who(c, w) : null;
                     return (
-                      <td class={k === 0 ? 'is-now' : ''} key={k}>
+                      <td class={k === 0 ? 'is-now' : k === 3 ? 'plan__far' : ''} key={k}>
                         {a ? (
                           <span class="plan__cell">
                             <Magnet id={a} size={28} label />
@@ -194,6 +198,8 @@ export function Putzen() {
         </div>
       </Section>
 
+      <History list={list} entry={entry} who={who} doneBy={doneBy} existedIn={existedIn} week={week} onOpen={(c, w) => setSheet({ chore: c, week: w })} />
+
       <Stats log={log} week={week} />
 
       <button type="button" class="btn btn--block" onClick={() => setManage(true)}>
@@ -203,6 +209,87 @@ export function Putzen() {
       {sheet && <ChoreSheet {...sheet} who={who} doneBy={doneBy} entry={entry} onClose={() => setSheet(null)} />}
       {manage && <ChoreManager startNew={manage === 'new'} onClose={() => setManage(false)} />}
     </>
+  );
+}
+
+/** Week by week: who cleaned what, and what was left undone. */
+function History({ list, entry, who, doneBy, existedIn, week, onOpen }) {
+  const me = meId.value;
+  const now = new Date(clock.value);
+  const [shown, setShown] = useState(4);
+  const loaded = choreWeeks.value - 1; // weeks before this one that are in memory
+  const weeks = [];
+  for (let k = 1; k <= Math.min(shown, loaded); k++) {
+    const w = week - k;
+    const rows = list.filter((c) => existedIn(c, w) && choreDue(c, w));
+    if (rows.length) weeks.push({ w, rows });
+  }
+  const anyOlder = list.some((c) => existedIn(c, week - shown - 1));
+  return (
+    <Section title="Wer hat wann geputzt?" id="verlauf">
+      {!weeks.length && <p class="section__text">Ab nächster Woche steht hier, wer in welcher Woche was erledigt hat.</p>}
+      {weeks.map(({ w, rows }) => {
+        const info = weekInfo(w);
+        const rel = relWeek(w, week);
+        return (
+          <div class="week" key={w}>
+            <h3 class="week__head">
+              <span>{rel[0].toUpperCase() + rel.slice(1)}</span>
+              <span class="week__dates">{rel === info.title ? info.dates : `${info.title}, ${info.dates}`}</span>
+            </h3>
+            <ul class="list">
+              {rows.map((c) => {
+                const a = who(c, w);
+                const d = doneBy(c, w);
+                const doneAt = entry(c, w)?.doneAt;
+                const at = d && doneAt ? dayLabelInline(dayKey(new Date(doneAt)), now) : '';
+                return (
+                  <li key={c.id}>
+                    <button type="button" class={`hrow${d ? ' is-done' : ' is-missed'}`} onClick={() => onOpen(c, w)}>
+                      <span class="chore__icon" aria-hidden="true">{c.icon}</span>
+                      <span class="hrow__main">
+                        <span class="hrow__name">{c.name}</span>
+                        <span class="hrow__who">
+                          {d
+                            ? `${d === me ? 'Du' : name(d)}${d !== a ? ` für ${a === me ? 'dich' : name(a)}` : ''}${at ? `, ${at}` : ''}`
+                            : `${a === me ? 'Du warst' : `${name(a)} war`} dran, nicht erledigt`}
+                        </span>
+                      </span>
+                      <Magnet id={d || a} size={28} />
+                      <span class={d ? 'hrow__mark' : 'hrow__mark hrow__mark--miss'} role="img" aria-label={d ? 'erledigt' : 'nicht erledigt'}>
+                        {d ? <Check size={22} /> : <Cross />}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+      {anyOlder && (
+        <button
+          type="button"
+          class="btn btn--block more"
+          onClick={() => {
+            const next = shown + 4;
+            setShown(next);
+            if (next > loaded) choreWeeks.value = next + 6;
+          }}
+        >
+          Ältere Wochen anzeigen
+        </button>
+      )}
+    </Section>
+  );
+}
+
+/** A loose red X for chores nobody did. */
+function Cross() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+      <path d="M5 5.5 L19 18.5 M18.5 5 L5.5 19" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+    </svg>
   );
 }
 
@@ -239,7 +326,7 @@ function ChoreSheet({ chore, week, who, doneBy, entry, onClose }) {
   return (
     <Sheet open title={`${chore.icon} ${chore.name}`} onClose={onClose}>
       <p class="sheet__text">
-        Kalenderwoche {info.kw}.{' '}
+        {info.title}, {info.range}.{' '}
         {d ? `Erledigt von ${nameDat(d)}.` : `${a === me ? 'Du bist' : `${name(a)} ist`} dran.`}
         {entry(chore, week)?.assignee && planned && planned !== a && ` Nach Plan wäre ${name(planned)} dran.`}
       </p>

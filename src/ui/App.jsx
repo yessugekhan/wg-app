@@ -1,4 +1,4 @@
-import { screen, route, go, wg, meId, sync, openItems, ctx } from '../state.js';
+import { screen, route, go, wg, meId, sync, openItems, ctx, toast } from '../state.js';
 import { Magnet, Toasts } from './kit.jsx';
 import { Start } from './Start.jsx';
 import { Liste } from './Liste.jsx';
@@ -41,33 +41,30 @@ function Shell() {
   );
 }
 
-function SyncLine() {
-  const { error, offline, pending, fromCache } = sync.value;
-  let text;
-  let tone = '';
+/** The dot next to the WG name. Tapping it explains what the color means. */
+export function syncState({ error, offline, pending, fromCache }, kind) {
   if (error === 'permission-denied') {
-    text = 'Kein Zugriff auf die Daten';
-    tone = 'is-bad';
-  } else if (error) {
-    text = 'Verbindungsproblem';
-    tone = 'is-bad';
-  } else if (offline) {
-    text = 'Offline, wird später synchronisiert';
-    tone = 'is-warn';
-  } else if (ctx.kind === 'local') {
-    text = 'Demo, nur auf diesem Gerät';
-    tone = 'is-quiet';
-  } else if (pending) {
-    text = 'Speichert …';
-  } else if (fromCache) {
-    text = 'Verbinde …';
-    tone = 'is-quiet';
-  } else {
-    text = 'Alle synchron';
+    return { text: 'Kein Zugriff', tone: 'is-bad', help: 'Rot: Dieser Link hat keinen Zugriff auf die Daten. Frag in der WG-Gruppe nach dem aktuellen Einladungslink.' };
   }
+  if (error) {
+    return { text: 'Verbindungsproblem', tone: 'is-bad', help: 'Rot: Die App erreicht den Server gerade nicht. Lade die Seite neu. Was du einträgst, bleibt auf dem Handy.' };
+  }
+  if (offline) {
+    return { text: 'Offline, sendet später', tone: 'is-warn', help: 'Gelb: Kein Internet. Du kannst weiter eintragen, alles bleibt auf dem Handy und wird gesendet, sobald du wieder online bist.' };
+  }
+  if (kind === 'local') return { text: 'Demo, nur auf diesem Gerät', tone: 'is-quiet', help: 'Grau: Das ist die Demo. Alles bleibt auf diesem Gerät, niemand sonst sieht es.' };
+  if (pending) return { text: 'Speichert …', tone: 'is-busy', help: 'Grün blinkend: Deine letzte Änderung wird gerade gesendet.' };
+  if (fromCache) return { text: 'Verbinde …', tone: 'is-quiet', help: 'Grau: Die App verbindet sich gerade und zeigt so lange den zuletzt gespeicherten Stand.' };
+  return { text: 'Alles gespeichert', tone: '', help: 'Grün: Alles ist gespeichert und alle in der WG sehen denselben Stand.' };
+}
+
+function SyncLine() {
+  const { text, tone, help } = syncState(sync.value, ctx.kind);
   return (
-    <span class={`sync ${tone}`} role="status">
-      {text}
+    <span role="status" class="sync-wrap">
+      <button type="button" class={`sync ${tone}`} title="Was heißt das?" onClick={() => toast(help, { ms: 6000 })}>
+        {text}
+      </button>
     </span>
   );
 }

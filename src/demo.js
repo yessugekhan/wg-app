@@ -54,6 +54,9 @@ export async function seedDemo(api, store) {
     ['Nudeln', false, clara, 6 * D],
     ['Milch', false, ben, 6 * D + 2 * H],
     ['Klopapier', true, ben, 9 * D],
+    ['Kaffee', false, deniz, 13 * D],
+    ['Spülmittel', true, anna, 15 * D],
+    ['Reis', false, clara, 16 * D],
   ];
   await store.commit(
     bought.map(([text, kasse, by, t]) =>
@@ -74,6 +77,7 @@ export async function seedDemo(api, store) {
   await tx({ type: 'deposit', title: 'Beitrag', amount: 1000, member: clara, month: mk }, clara, 2 * D);
   await tx({ type: 'expense', title: 'Pizza-Abend', amount: 2400, paidBy: ben, split: [ben, clara, deniz], kind: 'manual' }, ben, 1 * D);
   await tx({ type: 'transfer', title: 'Rückzahlung', amount: 500, from: clara, to: anna }, clara, 1 * D - 3 * H);
+  await tx({ type: 'expense', title: 'Ofenhandschuhe', amount: 1400, paidBy: clara, split: all, kind: 'manual' }, clara, 7 * H);
 
   // Chores: last week mostly done, one thing left open; this week the kitchen is done
   const w = weekIndex(new Date(now));

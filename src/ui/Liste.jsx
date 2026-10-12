@@ -1,10 +1,15 @@
 import { useMemo, useRef, useState } from 'preact/hooks';
 import {
   ctx, openItems, boughtItems, activeMembers, meId, name, nameDat, joinNames, run, toast, clock, visitSeen,
+  txs, txLimit, boughtLimit, currentWeek, pendingForm, go,
 } from '../state.js';
-import { guessKasse, suggest, relTime, parseMoney, formatMoney, KASSE, normalizeText, splitEvenly } from '../model.js';
-import { Headline, Sheet, Magnet, People, MoneyInput, Field, Box, Strike } from './kit.jsx';
+import {
+  guessKasse, suggest, relTime, parseMoney, formatMoney, KASSE, normalizeText, splitEvenly, dayKey, dayLabelInline, weekIndex,
+  weekInfo, relWeek, parseDayKey,
+} from '../model.js';
+import { Headline, Section, Sheet, Magnet, People, MoneyInput, Field, Box, Strike } from './kit.jsx';
 import { IPlus, ITrash, IPencil, IHand, ICart } from './icons.jsx';
+import { perPerson } from './Geld.jsx';
 
 const plural = (n, one, many) => (n === 1 ? one : many.replace('#', n));
 
@@ -95,7 +100,7 @@ export function Liste() {
         </div>
       )}
 
-      <History />
+      <Bought />
 
       <ItemSheet item={actionItem} onClose={() => setActionItem(null)} />
       <Checkout open={checkout} items={mine} onClose={() => setCheckout(false)} />
@@ -206,46 +211,108 @@ function Adder() {
   );
 }
 
-function History() {
-  const me = meId.value;
-  const onList = new Set(openItems.value.map((i) => i.text.toLowerCase()));
-  const seen = new Set();
-  const list = [];
-  for (const it of boughtItems.value) {
-    const k = it.text.toLowerCase();
-    if (seen.has(k)) continue;
-    seen.add(k);
-    list.push(it);
+/** Purchases as a timeline: one entry per shopping trip or booked purchase, grouped by week. */
+export function purchaseEntries(bought, txList) {
+  const txById = new Map(txList.map((t) => [t.id, t]));
+  const trips = new Map();
+  for (const it of bought) {
+    if (!it.boughtAt) continue;
+    const key = `${it.boughtBy}|${it.boughtAt}`;
+    let e = trips.get(key);
+    if (!e) {
+      e = { key, by: it.boughtBy, at: it.boughtAt, date: dayKey(new Date(it.boughtAt)), items: [], txs: [] };
+      trips.set(key, e);
+    }
+    e.items.push(it.text);
+    const t = it.txId && txById.get(it.txId);
+    if (t && !e.txs.includes(t)) e.txs.push(t);
   }
-  if (!list.length) return null;
+  const out = [...trips.values()];
+  // things bought without the list (oven gloves, internet bill, pizza) are bookings only
+  for (const t of txList) {
+    if (t.type !== 'expense' || t.itemIds?.length) continue;
+    out.push({ key: t.id, by: t.paidBy === KASSE ? t.createdBy : t.paidBy, at: t.createdAt || 0, date: t.date, items: [t.title], txs: [t], manual: true });
+  }
+  return out.sort((a, b) => (a.date === b.date ? b.at - a.at : a.date < b.date ? 1 : -1));
+}
+
+function Bought() {
+  const me = meId.value;
+  const now = new Date(clock.value);
+  const cur = currentWeek.value;
+  const [shown, setShown] = useState(3);
+  const entries = purchaseEntries(boughtItems.value, txs.value);
+  const weeks = [];
+  for (const e of entries) {
+    const w = weekIndex(parseDayKey(e.date));
+    const last = weeks[weeks.length - 1];
+    if (last && last.w === w) last.entries.push(e);
+    else weeks.push({ w, entries: [e] });
+  }
+  const mayHaveMore = boughtItems.value.length >= boughtLimit.value || txs.value.length >= txLimit.value;
+  const addPurchase = () => {
+    pendingForm.value = { mode: 'expense' };
+    go('geld');
+  };
   return (
-    <details class="history">
-      <summary>Zuletzt gekauft</summary>
-      <ul class="list">
-        {list.map((it) => (
-          <li class="hist" key={it.id}>
-            <span class="hist__text">
-              <span>{it.text}</span>
-              <span class="hist__meta">
-                {name(it.boughtBy, { cap: true })}, {relTime(it.boughtAt, clock.value)}
-              </span>
-            </span>
-            <button
-              type="button"
-              class="icon-btn"
-              aria-label={`${it.text} wieder auf die Liste`}
-              disabled={onList.has(it.text.toLowerCase())}
-              onClick={() => {
-                run(ctx.api.addItem({ text: it.text, kasse: it.kasse, by: me }));
-                toast(`${it.text} steht wieder auf der Liste.`);
-              }}
-            >
-              <IPlus />
-            </button>
-          </li>
-        ))}
-      </ul>
-    </details>
+    <Section
+      title="Wer hat was gekauft?"
+      id="gekauft"
+      aside={
+        <button type="button" class="link-btn" onClick={addPurchase}>
+          <IPlus size={18} /> Einkauf eintragen
+        </button>
+      }
+    >
+      {!weeks.length && <p class="section__text">Hier steht, wer wann was gekauft hat. Hak Sachen auf der Liste ab oder trag einen Einkauf ein.</p>}
+      {weeks.slice(0, shown).map(({ w, entries: list }) => {
+        const info = weekInfo(w);
+        const rel = relWeek(w, cur);
+        return (
+          <div class="week" key={w}>
+            <h3 class="week__head">
+              <span>{rel[0].toUpperCase() + rel.slice(1)}</span>
+              <span class="week__dates">{rel === info.title ? info.dates : `${info.title}, ${info.dates}`}</span>
+            </h3>
+            <ul class="list">
+              {list.map((e) => (
+                <li class="buy" key={e.key}>
+                  <Magnet id={e.by} size={30} />
+                  <span class="buy__main">
+                    <span class="buy__what">{e.items.join(', ')}</span>
+                    <span class="buy__meta">
+                      {name(e.by, { cap: true })}, {dayLabelInline(e.date, now)}
+                      {e.txs.map((t) => (
+                        <span key={t.id}>
+                          {' · '}
+                          {formatMoney(t.amount)}
+                          {t.paidBy === KASSE ? ' aus der Kasse' : perPerson(t) ? `, ${perPerson(t)}` : ''}
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+      {(weeks.length > shown || (weeks.length && mayHaveMore)) && (
+        <button
+          type="button"
+          class="btn btn--block more"
+          onClick={() => {
+            setShown(shown + 4);
+            if (weeks.length <= shown + 4 && mayHaveMore) {
+              boughtLimit.value += 60;
+              txLimit.value += 100;
+            }
+          }}
+        >
+          Ältere Wochen anzeigen
+        </button>
+      )}
+    </Section>
   );
 }
 

@@ -4,7 +4,7 @@
 import { INC, DEL } from './store/ops.js';
 import {
   KASSE, txEffect, effectDiff, negateEffect, addEffects, computeSummary, isEmptyEffect, normalizeText,
-  shoppingTitle, dayKey, weekIndex, rebaseRotation, startRotationWith, choreLogId,
+  shoppingTitle, dayKey, weekIndex, rebaseRotation, startRotationWith, choreLogId, SUMMARY_VERSION,
 } from './model.js';
 
 export const MEMBER_COLORS = 10;
@@ -32,6 +32,7 @@ export function createApi(store) {
     if (!effect || isEmptyEffect(effect)) return null;
     const data = { updatedAt: now() };
     if (Object.keys(effect.balances).length) data.balances = mapValues(effect.balances, INC);
+    if (Object.keys(effect.pairs).length) data.pairs = mapValues(effect.pairs, INC);
     if (effect.kasse) data.kasse = INC(effect.kasse);
     if (Object.keys(effect.contrib).length) data.contrib = mapValues(effect.contrib, (per) => mapValues(per, INC));
     return setOp('meta/summary', data);
@@ -51,7 +52,7 @@ export function createApi(store) {
       const ids = members.map((m) => m.id);
       const ops = [
         setOp('meta/wg', { name: normalizeText(wgName) || 'Unsere WG', kasseMonthly, createdAt: ts, version: 1 }),
-        setOp('meta/summary', { createdAt: ts }),
+        setOp('meta/summary', { createdAt: ts, v: SUMMARY_VERSION }),
         // createdAt + i keeps the order people were entered in
         ...members.map((m, i) => setOp(`members/${m.id}`, { name: m.name, color: m.color, active: true, createdAt: ts + i }, false)),
       ];
@@ -213,13 +214,17 @@ export function createApi(store) {
       return commit([delOp(`tx/${tx.id}`), summaryOp(negateEffect(txEffect(stripId(tx))))]);
     },
 
-    /** Rebuilds balances from every transaction (repair tool). Needs a live connection. */
+    /** Rebuilds all totals from every transaction (repair tool, and upgrade of older summaries). Needs a live connection. */
     async recomputeSummary() {
       const txs = await store.getCollection('tx', {}, { server: true });
       const s = computeSummary(txs);
       const ts = now();
       await commit([
-        setOp('meta/summary', { balances: s.balances, kasse: s.kasse, contrib: s.contrib, updatedAt: ts, recomputedAt: ts }, false),
+        setOp(
+          'meta/summary',
+          { balances: s.balances, pairs: s.pairs, kasse: s.kasse, contrib: s.contrib, v: SUMMARY_VERSION, updatedAt: ts, recomputedAt: ts },
+          false,
+        ),
       ]);
       return s;
     },

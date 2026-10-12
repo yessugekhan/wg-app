@@ -79,8 +79,11 @@ export function splitEvenly(amount, ids) {
   return out;
 }
 
+/** Bump this when the shape of meta/summary changes; older summaries get rebuilt once. */
+export const SUMMARY_VERSION = 2;
+
 export function emptyEffect() {
-  return { balances: {}, kasse: 0, contrib: {} };
+  return { balances: {}, kasse: 0, contrib: {}, pairs: {} };
 }
 
 function bump(map, key, delta) {
@@ -88,8 +91,37 @@ function bump(map, key, delta) {
   map[key] = (map[key] || 0) + delta;
 }
 
+/** Debts between two people live under one key per pair: "a|b" (a < b), positive = a owes b. */
+export function pairKey(a, b) {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+/** Records that `debtor` owes `creditor` `amount` more (negative: less). */
+function owe(pairs, debtor, creditor, amount) {
+  if (!debtor || !creditor || debtor === creditor || !amount) return;
+  bump(pairs, pairKey(debtor, creditor), debtor < creditor ? amount : -amount);
+}
+
+/** How much a owes b according to a pairs map (negative: b owes a). */
+export function owes(pairs, a, b) {
+  const v = (pairs || {})[pairKey(a, b)] || 0;
+  return (a < b ? v : -v) || 0;
+}
+
+/** Every open debt as { from, to, amount } with amount > 0, biggest first. */
+export function debtList(pairs) {
+  const out = [];
+  for (const [k, v] of Object.entries(pairs || {})) {
+    if (!v) continue;
+    const [a, b] = k.split('|');
+    out.push(v > 0 ? { from: a, to: b, amount: v } : { from: b, to: a, amount: -v });
+  }
+  return out.sort((x, y) => y.amount - x.amount || (x.from + x.to < y.from + y.to ? -1 : 1));
+}
+
 function cleanEffect(e) {
   for (const k of Object.keys(e.balances)) if (!e.balances[k]) delete e.balances[k];
+  for (const k of Object.keys(e.pairs)) if (!e.pairs[k]) delete e.pairs[k];
   for (const m of Object.keys(e.contrib)) {
     for (const k of Object.keys(e.contrib[m])) if (!e.contrib[m][k]) delete e.contrib[m][k];
     if (!Object.keys(e.contrib[m]).length) delete e.contrib[m];
@@ -98,9 +130,15 @@ function cleanEffect(e) {
   return e;
 }
 
+/** The money part of a meta/summary document, in the same shape computeSummary returns. */
+export function summaryOf(doc) {
+  return { balances: doc?.balances || {}, kasse: doc?.kasse || 0, contrib: doc?.contrib || {}, pairs: doc?.pairs || {} };
+}
+
 /**
  * What a transaction does to the books.
  * balances: positive = the WG owes this person money, negative = this person owes.
+ * pairs: who owes whom, per pair of people (see pairKey). The pairs of a person always add up to their balance.
  * kasse: cash in the shared WG-Kasse. contrib: monthly Kasse contributions per member.
  *
  * expense  {amount, paidBy: memberId | 'kasse', split: [memberIds]}
@@ -118,7 +156,10 @@ export function txEffect(tx) {
       } else {
         bump(e.balances, tx.paidBy, a);
         const split = tx.split && tx.split.length ? tx.split : [tx.paidBy];
-        for (const [id, share] of Object.entries(splitEvenly(a, split))) bump(e.balances, id, -share);
+        for (const [id, share] of Object.entries(splitEvenly(a, split))) {
+          bump(e.balances, id, -share);
+          owe(e.pairs, id, tx.paidBy, share);
+        }
       }
       break;
     }
@@ -132,6 +173,7 @@ export function txEffect(tx) {
     case 'transfer':
       bump(e.balances, tx.from, a);
       bump(e.balances, tx.to, -a);
+      owe(e.pairs, tx.from, tx.to, -a);
       break;
     default:
       break;
@@ -144,6 +186,7 @@ export function addEffects(...effects) {
   for (const e of effects) {
     if (!e) continue;
     for (const [k, v] of Object.entries(e.balances || {})) bump(out.balances, k, v);
+    for (const [k, v] of Object.entries(e.pairs || {})) bump(out.pairs, k, v);
     out.kasse += e.kasse || 0;
     for (const [m, per] of Object.entries(e.contrib || {})) {
       out.contrib[m] = out.contrib[m] || {};
@@ -156,6 +199,7 @@ export function addEffects(...effects) {
 export function negateEffect(e) {
   const out = emptyEffect();
   for (const [k, v] of Object.entries(e.balances || {})) out.balances[k] = -v;
+  for (const [k, v] of Object.entries(e.pairs || {})) out.pairs[k] = -v;
   out.kasse = -(e.kasse || 0);
   for (const [m, per] of Object.entries(e.contrib || {})) {
     out.contrib[m] = {};
@@ -170,7 +214,7 @@ export function effectDiff(newTx, oldTx) {
 }
 
 export function isEmptyEffect(e) {
-  return !e.kasse && !Object.keys(e.balances).length && !Object.keys(e.contrib).length;
+  return !e.kasse && !Object.keys(e.balances).length && !Object.keys(e.contrib).length && !Object.keys(e.pairs || {}).length;
 }
 
 export function computeSummary(txs) {
@@ -179,6 +223,25 @@ export function computeSummary(txs) {
 
 export function summariesEqual(a, b) {
   return isEmptyEffect(addEffects(a || emptyEffect(), negateEffect(b || emptyEffect())));
+}
+
+/**
+ * The open part of one debt, explained: the bookings that make up what a owes b right now.
+ * Walks back from the newest booking until the pair was last even. txs: newest first (may be
+ * only the most recent ones); complete: false means older bookings would be needed.
+ */
+export function debtReasons(txs, a, b, current) {
+  const out = [];
+  let rest = current;
+  if (!rest) return { items: out, complete: true };
+  for (const tx of txs || []) {
+    const d = owes(txEffect(tx).pairs, a, b);
+    if (!d) continue;
+    out.push({ tx, delta: d });
+    rest -= d;
+    if (!rest) return { items: out, complete: true };
+  }
+  return { items: out, complete: false };
 }
 
 /** Who pays whom so that every balance ends at zero (greedy, at most n-1 transfers). */
@@ -249,6 +312,12 @@ export function dayLabel(dk, now = new Date()) {
   return `${WEEKDAY.format(d)}, ${DAY_MONTH.format(d)}`;
 }
 
+/** dayLabel for the middle of a sentence: "heute", "gestern", "Mo, 12. Okt." */
+export function dayLabelInline(dk, now = new Date()) {
+  const l = dayLabel(dk, now);
+  return l === 'Heute' || l === 'Gestern' ? l.toLowerCase() : l;
+}
+
 const EPOCH = new Date(2024, 0, 1, 12); // a Monday
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 
@@ -273,7 +342,44 @@ export function isoWeekNumber(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
-/** { kw: 42, range: "12. bis 18. Oktober" } (or "28. September bis 4. Oktober"). */
+/**
+ * Lecture periods of TU Darmstadt (tu-darmstadt.de, Semestertermine), so weeks can be counted the way
+ * the university does: 1. Vorlesungswoche, 2. Vorlesungswoche … Breaks inside a semester do not count.
+ */
+export const SEMESTERS = [
+  { name: 'Wintersemester 2026/27', start: '2026-10-12', end: '2027-02-12', breaks: [['2026-12-21', '2027-01-08', 'Weihnachtspause']] },
+  { name: 'Sommersemester 2027', start: '2027-04-12', end: '2027-07-16', breaks: [] },
+  { name: 'Wintersemester 2027/28', start: '2027-10-11', end: '2028-02-11', breaks: [['2027-12-20', '2028-01-07', 'Weihnachtspause']] },
+  { name: 'Sommersemester 2028', start: '2028-04-18', end: '2028-07-21', breaks: [] },
+  { name: 'Wintersemester 2028/29', start: '2028-10-16', end: '2029-02-16', breaks: [['2028-12-25', '2029-01-12', 'Weihnachtspause']] },
+  { name: 'Sommersemester 2029', start: '2029-04-16', end: '2029-07-20', breaks: [] },
+  { name: 'Wintersemester 2029/30', start: '2029-10-15', end: '2030-02-15', breaks: [['2029-12-24', '2030-01-11', 'Weihnachtspause']] },
+  { name: 'Sommersemester 2030', start: '2030-04-23', end: '2030-07-26', breaks: [] },
+  { name: 'Wintersemester 2030/31', start: '2030-10-14', end: '2031-02-14', breaks: [['2030-12-23', '2031-01-10', 'Weihnachtspause']] },
+];
+
+const weekOfDay = (k) => weekIndex(parseDayKey(k));
+
+/** { kind: 'lecture', n, semester } | { kind: 'break', label, semester } | { kind: 'free' } */
+export function semesterWeek(index, semesters = SEMESTERS) {
+  for (const s of semesters) {
+    const first = weekOfDay(s.start);
+    if (index < first || index > weekOfDay(s.end)) continue;
+    const brk = (w) => s.breaks.find(([a, b]) => weekOfDay(a) <= w && w <= weekOfDay(b));
+    const b = brk(index);
+    if (b) return { kind: 'break', label: b[2] || 'Pause', semester: s.name };
+    let n = 0;
+    for (let w = first; w <= index; w++) if (!brk(w)) n++;
+    return { kind: 'lecture', n, semester: s.name };
+  }
+  return { kind: 'free' };
+}
+
+/**
+ * Everything needed to name a week without calendar-week numbers:
+ * title "3. Vorlesungswoche" | "Weihnachtspause" | "Semesterferien", short "Woche 3" | "Pause" | "Ferien",
+ * range "26. Oktober bis 1. November", dates "26.10.–1.11.", from "26. Okt."
+ */
 export function weekInfo(index) {
   const mon = weekMonday(index);
   const sun = new Date(mon);
@@ -282,7 +388,30 @@ export function weekInfo(index) {
   const range = mon.getMonth() === sun.getMonth()
     ? `${mon.getDate()}. bis ${sun.getDate()}. ${month(sun)}`
     : `${mon.getDate()}. ${month(mon)} bis ${sun.getDate()}. ${month(sun)}`;
-  return { kw: isoWeekNumber(mon), range };
+  const dates = `${mon.getDate()}.${mon.getMonth() + 1}.–${sun.getDate()}.${sun.getMonth() + 1}.`;
+  const from = DAY_MONTH.format(mon);
+  const sem = semesterWeek(index);
+  let title;
+  let short;
+  if (sem.kind === 'lecture') {
+    title = `${sem.n}. Vorlesungswoche`;
+    short = `Woche ${sem.n}`;
+  } else if (sem.kind === 'break') {
+    title = sem.label;
+    short = 'Pause';
+  } else {
+    title = 'Semesterferien';
+    short = 'Ferien';
+  }
+  return { index, kw: isoWeekNumber(mon), range, dates, from, title, short, sem };
+}
+
+/** "diese Woche", "letzte Woche", "nächste Woche", else the week's title. */
+export function relWeek(index, current) {
+  if (index === current) return 'diese Woche';
+  if (index === current - 1) return 'letzte Woche';
+  if (index === current + 1) return 'nächste Woche';
+  return weekInfo(index).title;
 }
 
 /** "gerade eben", "vor 5 Min.", "vor 2 Std.", "gestern", "vor 3 Tagen", "12. Okt." */

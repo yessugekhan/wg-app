@@ -3,7 +3,7 @@
 // set/merge, increment(), deleteField(), 'in' / '>=' / '==' filters, orderBy + limit.
 import { createFirestoreStore } from '../src/store/firestore.js';
 import { createApi } from '../src/api.js';
-import { KASSE, weekIndex, computeSummary, summariesEqual } from '../src/model.js';
+import { KASSE, weekIndex, computeSummary, summariesEqual, summaryOf, owes, SUMMARY_VERSION } from '../src/model.js';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -26,7 +26,7 @@ window.runHarness = async () => {
   const watchDoc = (key, path) => store.watchDoc(path, (d, m) => (live[key] = { d, m }), (e) => errs.push(`${key}: ${e.code}`));
   watch('members', 'members', {});
   watch('open', 'items', { where: [['state', 'in', ['open', 'cart']]] });
-  watch('bought', 'items', { orderBy: ['boughtAt', 'desc'], limit: 40 });
+  watch('bought', 'items', { orderBy: ['boughtAt', 'desc'], limit: 60 });
   watch('tx', 'tx', { orderBy: ['sortKey', 'desc'], limit: 80 });
   watch('chores', 'chores', {});
   watch('log', 'choreLog', { where: [['week', '>=', weekIndex() - 9]] });
@@ -66,6 +66,7 @@ window.runHarness = async () => {
   check('bought items leave the open query', live.open.docs.length === 2, live.open.docs.map((d) => d.text));
   check('orderBy boughtAt + limit', live.bought?.docs.length === 1 && live.bought.docs[0].boughtBy === a && !('claimedBy' in live.bought.docs[0]), live.bought?.docs);
   check('increment() on nested summary', live.summary?.d?.balances?.[a] === 600 && live.summary.d.balances[b] === -300, live.summary?.d);
+  check('per-person debts under "a|b" keys', owes(live.summary.d.pairs, b, a) === 300 && owes(live.summary.d.pairs, c, a) === 300 && live.summary.d.v === SUMMARY_VERSION, live.summary.d.pairs);
 
   fire(api.addTx({ type: 'deposit', amount: 1000, member: b, month: '2026-10', title: 'Beitrag' }, b));
   fire(api.addTx({ type: 'expense', amount: 450, paidBy: KASSE, split: [a, b, c], title: 'Spüli' }, c));
@@ -73,6 +74,7 @@ window.runHarness = async () => {
   await wait(250);
   const s1 = live.summary.d;
   check('summary after deposit, Kasse expense, transfer', s1.kasse === 550 && s1.balances[a] === 300 && s1.balances[b] === 0 && s1.contrib['2026-10'][b] === 1000, s1);
+  check('paying back settles exactly that pair', owes(s1.pairs, b, a) === 0 && owes(s1.pairs, c, a) === 300, s1.pairs);
   const keys = live.tx.docs.map((t) => t.sortKey);
   check('tx ordered by sortKey desc', live.tx.docs.length === 4 && keys.every((k, i) => i === 0 || keys[i - 1] >= k), keys);
   const exp = live.tx.docs.find((t) => t.type === 'expense' && t.paidBy === a);
@@ -82,7 +84,7 @@ window.runHarness = async () => {
   fire(api.deleteTx(live.tx.docs.find((t) => t.type === 'transfer')));
   await wait(200);
   const sNow = live.summary.d;
-  check('running summary equals recomputed one', summariesEqual({ balances: sNow.balances, kasse: sNow.kasse, contrib: sNow.contrib }, computeSummary(live.tx.docs)), sNow);
+  check('running summary equals recomputed one', summariesEqual(summaryOf(sNow), computeSummary(live.tx.docs)), sNow);
 
   const [ch] = live.chores.docs;
   const w = weekIndex();
