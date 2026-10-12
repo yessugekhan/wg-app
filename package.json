@@ -1,0 +1,26 @@
+{
+  "name": "wg-app",
+  "version": "1.0.0",
+  "description": "WG-App: Einkaufsliste, Geld, Putzplan, Pinnwand",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "build": "node build.mjs",
+    "e2e": "node test/e2e.mjs",
+    "check:firestore": "node test/firestore-check.mjs",
+    "icons": "node tools/icons.mjs"
+  },
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
+    "@preact/signals": "^2.11.3",
+    "firebase": "^13.0.0",
+    "preact": "^11.0.1",
+    "qrcode-generator": "^2.0.4"
+  },
+  "devDependencies": {
+    "@sparticuz/chromium": "^153.0.0",
+    "esbuild": "^0.28.2",
+    "puppeteer-core": "^25.13.0"
+  }
+}

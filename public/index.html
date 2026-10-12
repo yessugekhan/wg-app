@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>WG</title>
+    <meta name="description" content="Einkaufsliste, Geld, Putzplan und Pinnwand für eure WG." />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#f5f6f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#14171c" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="WG" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <script>
+      // iPhone home-screen apps keep their own storage. Without a start_url, iOS keeps the current
+      // address (with the #wg= code) when someone adds the app to the home screen.
+      if (/iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+        document.querySelector('link[rel=manifest]').href = './manifest-ios.webmanifest';
+      }
+      try {
+        var t = localStorage.getItem('wgapp:theme');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+    <link rel="icon" href="./icons/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="preload" href="__FONT_PRELOAD__" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="__CSS__" />
+    <script src="./config.js"></script>
+    <script type="module" src="__JS__"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>Für die WG-App muss JavaScript eingeschaltet sein.</noscript>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// Firestore-Regeln für die WG-App.
+// DEIN-WG-CODE durch den Code aus dem Einladungslink ersetzen (alles nach #wg=).
+// Der Code ist der Schlüssel zu euren Daten: diese Datei mit echtem Code nicht ins öffentliche Repo legen.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /wgs/{wgId}/{collection}/{docId} {
+      allow read, write: if wgId == 'DEIN-WG-CODE'
+        && collection in ['meta', 'members', 'items', 'tx', 'chores', 'choreLog', 'posts'];
+    }
+  }
+}

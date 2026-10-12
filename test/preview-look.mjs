@@ -1,0 +1,17 @@
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
+import { readFile } from 'node:fs/promises';
+const body = await readFile('/home/claude/wg-app/dist/preview.html', 'utf8');
+const html = `<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style></head><body>${body}</body></html>`;
+const browser = await puppeteer.launch({ executablePath: await chromium.executablePath(), headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--no-zygote', '--headless=shell'] });
+const page = await browser.newPage();
+const errors = [];
+page.on('pageerror', (e) => errors.push(e.message));
+page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+await page.goto('data:text/html;base64,' + Buffer.from(html).toString('base64'), { waitUntil: 'load' }).catch(async () => { await page.setContent(html, { waitUntil: 'load' }); });
+await page.waitForFunction(() => document.querySelector('.headline h1')?.textContent.includes('fehlen'), { timeout: 8000 });
+console.log('H1:', await page.$eval('.headline h1', (e) => e.textContent), '| me:', await page.$eval('.topbar__me', (e) => e.textContent), '| sync:', await page.$eval('.sync', (e) => e.textContent));
+console.log('overflow:', await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 'errors:', errors);
+await page.screenshot({ path: '/tmp/claude-0/-home-claude/5a6a98b1-a0eb-5bf0-ae98-9eefc42c6536/scratchpad/preview.png' });
+await browser.close();
